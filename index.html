@@ -33,6 +33,7 @@ th{font-size:12px;text-transform:uppercase;color:var(--m);background:#f8faf9;pos
 .err{color:var(--r);font-size:13px;margin-top:8px}.m{color:var(--m);font-size:13px}
 .login{max-width:360px;margin:12vh auto;background:#fff;padding:26px;border-radius:14px;border:1px solid var(--b)}
 .login h2{margin-top:0;color:var(--gd)}.acts{display:flex;gap:6px;flex-wrap:wrap}
+.loc{table-layout:fixed}.loc th:nth-child(1){width:52%}.loc th:nth-child(2){width:14%}.loc th:nth-child(3){width:20%}.loc td{overflow-wrap:anywhere}
 .tl{border-left:3px solid var(--b);padding-left:12px;margin:10px 0}
 #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:8px;z-index:20;display:none}
 </style></head><body>
@@ -48,7 +49,7 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=d=>new Date(d).toLocaleString('pt-BR');
 const ST={disponivel:'Disponível (CIMI)',em_uso:'Em uso',baixa:'Baixa'};
-const GR_CIMI='CIMI (Estoque)';
+let gSel='todos';const GR_CIMI='CIMI (Estoque)';
 const GRUPOS=['Estações BRT Norte Sul','Estações BRT Leste Oeste','Terminais Estações BRT Leste - Oeste','Terminais Estações BRT Norte - Sul','Terminais Primitivos',"PA'S"];
 const tipoDe=g=>g===GR_CIMI?'estoque':g.startsWith('Terminais')?'terminal':g==="PA'S"?'pa':'estacao';
 function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',3000)}
@@ -159,10 +160,14 @@ function painel(){const c=k=>D.f.filter(x=>x.status===k).length;
 function histView(){return`<div class="tw"><table><tr><th>Quando</th><th>Tipo</th><th>Ferramenta</th><th>Local</th><th>Pessoa</th><th>Foto</th><th>Registrado por</th></tr>
  ${D.m.map(x=>`<tr><td>${fmt(x.created_at)}</td><td><span class="bd ${x.tipo}">${x.tipo}</span></td><td>${esc(F(x.ferramenta_id)?.nome)}<div class="m">${esc(F(x.ferramenta_id)?.patrimonio)}</div></td>
  <td>${esc(L(x.local_id)?.nome)}</td><td>${esc(x.pessoa)}</td><td><img class="ph" src="${x.foto_url}" onclick="foto('${x.foto_url}')"></td><td>${esc(x.usuario_nome)}</td></tr>`).join('')||'<tr><td colspan=7 class="m">Sem movimentações ainda.</td></tr>'}</table></div>`}
-function locais(){const t=q.toLowerCase();const lista=D.l.filter(l=>`${l.nome} ${l.armazem} ${l.centro_custo}`.toLowerCase().includes(t));
- const sec=g=>{const r=lista.filter(l=>(l.grupo||'Sem grupo')===g);return r.length?`<h3 style="margin:20px 0 8px;color:var(--gd)">${esc(g)} <span class="m">(${r.length})</span></h3><div class="tw"><table><tr><th>Local</th><th>Armazém</th><th>Centro de custo</th><th></th></tr>
+function locais(){const t=q.toLowerCase();const todos=[GR_CIMI,...GRUPOS,'Sem grupo'];
+ const cnt=g=>D.l.filter(l=>(l.grupo||'Sem grupo')===g).length;if(gSel!=='todos'&&!cnt(gSel))gSel='todos';
+ const lista=D.l.filter(l=>`${l.nome} ${l.armazem} ${l.centro_custo}`.toLowerCase().includes(t));
+ const sec=g=>{if(gSel!=='todos'&&gSel!==g)return'';const r=lista.filter(l=>(l.grupo||'Sem grupo')===g);return r.length?`<h3 style="margin:20px 0 8px;color:var(--gd)">${esc(g)} <span class="m">(${r.length})</span></h3><div class="tw"><table class="loc"><tr><th>Local</th><th>Armazém</th><th>Centro de custo</th><th></th></tr>
  ${r.map(l=>`<tr><td><b>${esc(l.nome)}</b></td><td>${esc(l.armazem||'')}</td><td>${esc(l.centro_custo||'')}</td><td style="text-align:right"><button class="btn s o" onclick="act(editL,'${l.id}',D.l)">✏️ Editar</button></td></tr>`).join('')}</table></div>`:''};
- return`<div class="bar"><input id="q" placeholder="🔎 Buscar local..." value="${esc(q)}"><button class="btn" onclick="novoL()">+ Novo local</button></div>${[GR_CIMI,...GRUPOS,'Sem grupo'].map(sec).join('')||'<p class="m">Nenhum local encontrado.</p>'}`}
+ const chip=(g,n)=>`<button class="btn s ${gSel===g?'':'o'}" data-g="${esc(g)}" onclick="gSel=this.dataset.g;render()">${esc(g==='todos'?'Todos':g)} (${n})</button>`;
+ return`<div class="card" style="margin-bottom:12px"><div class="m" style="margin-bottom:8px">Grupos de locais</div><div class="acts">${chip('todos',D.l.length)}${todos.filter(cnt).map(g=>chip(g,cnt(g))).join('')}</div></div>
+ <div class="bar"><input id="q" placeholder="🔎 Buscar local..." value="${esc(q)}"><button class="btn" onclick="novoL()">+ Novo local</button></div>${todos.map(sec).join('')||'<p class="m">Nenhum local encontrado.</p>'}`}
 function edic(){return`<div class="tw"><table><tr><th>Quando</th><th>Quem editou</th><th>Onde</th><th>Campo</th><th>De → Para</th><th>Validação</th></tr>
  ${D.e.map(x=>`<tr><td>${fmt(x.created_at)}</td><td>${esc(x.usuario_nome)}</td><td>${esc(x.tabela)}: ${esc(x.registro)}</td><td>${esc(x.campo)}</td><td>${esc(x.valor_antigo||'∅')} → <b>${esc(x.valor_novo||'∅')}</b></td><td class="m">${esc(x.nota)}</td></tr>`).join('')||'<tr><td colspan=6 class="m">Nenhuma edição registrada.</td></tr>'}</table></div>`}
 start();
