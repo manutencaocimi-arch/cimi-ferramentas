@@ -48,7 +48,9 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=d=>new Date(d).toLocaleString('pt-BR');
 const ST={disponivel:'Disponível (CIMI)',em_uso:'Em uso',baixa:'Baixa'};
-const TP={estoque:'Estoque',estacao:'Estação',terminal:'Terminal',pa:'PA'};
+const GR_CIMI='CIMI (Estoque)';
+const GRUPOS=['Estações BRT Norte Sul','Estações BRT Leste Oeste','Terminais Estações BRT Leste - Oeste','Terminais Estações BRT Norte - Sul','Terminais Primitivos',"PA'S"];
+const tipoDe=g=>g===GR_CIMI?'estoque':g.startsWith('Terminais')?'terminal':g==="PA'S"?'pa':'estacao';
 function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',3000)}
 const L=id=>D.l.find(x=>x.id===id),F=id=>D.f.find(x=>x.id===id);
 const cimi=()=>D.l.find(x=>x.tipo==='estoque');
@@ -77,7 +79,9 @@ async function load(){
 function form(title,fields,okLabel,onSubmit){
  const m=document.createElement('div');m.className='mask';
  const inp=f=>{const v=f.value??'';
-  if(f.t==='select')return`<select name="${f.k}">${f.opts.map(o=>`<option value="${esc(o[0])}" ${o[0]==v?'selected':''}>${esc(o[1])}</option>`).join('')}</select>`;
+  if(f.t==='select'){const op=o=>`<option value="${esc(o[0])}" ${o[0]==v?'selected':''}>${esc(o[1])}</option>`;let h='',g=null;
+   f.opts.forEach(o=>{if(o[2]!==g){if(g!==null)h+='</optgroup>';g=o[2];if(g!==undefined)h+=`<optgroup label="${esc(g)}">`}h+=op(o)});if(g!==undefined&&g!==null)h+='</optgroup>';
+   return`<select name="${f.k}">${h}</select>`}
   if(f.t==='file')return`<input type="file" name="${f.k}" accept="image/*" capture="environment">`;
   if(f.t==='area')return`<textarea name="${f.k}" rows="2">${esc(v)}</textarea>`;
   return`<input name="${f.k}" type="${f.t||'text'}" value="${esc(v)}" autocomplete="off">`};
@@ -102,8 +106,8 @@ async function logEdit(tabela,reg,diffs){await sb.from('edicoes').insert(diffs.m
  usuario_id:me.id,usuario_nome:me.nome,nota:'Edição feita mediante a senha de acesso'})))}
 
 // ---------- Ações ----------
-function retirar(f){const dest=D.l.filter(x=>x.tipo!=='estoque');
- form(`Retirar: ${esc(f.nome)}`,[{k:'local',l:'Local de destino (onde será usada)',t:'select',opts:dest.map(x=>[x.id,x.nome])},
+function retirar(f){const gi=x=>{const i=GRUPOS.indexOf(x.grupo);return i<0?99:i};const dest=D.l.filter(x=>x.tipo!=='estoque').sort((a,b)=>gi(a)-gi(b)||a.nome.localeCompare(b.nome));
+ form(`Retirar: ${esc(f.nome)}`,[{k:'local',l:'Local de destino (onde será usada)',t:'select',opts:dest.map(x=>[x.id,x.nome,x.grupo||'Outros'])},
  {k:'pessoa',l:'Nome de quem está retirando'},{k:'foto',l:'📷 Foto de quem retirou (obrigatória)',t:'file'},{k:'obs',l:'Observação',t:'area'}],'Confirmar retirada',async v=>{
   if(!v.pessoa||!v.foto)return'Informe o nome e tire a foto.';const url=await upload(v.foto,f.id);
   let r=await sb.from('movimentacoes').insert({ferramenta_id:f.id,tipo:'retirada',local_id:v.local,pessoa:v.pessoa,foto_url:url,obs:v.obs,usuario_id:me.id,usuario_nome:me.nome});if(r.error)throw r.error;
@@ -122,13 +126,13 @@ function editF(f){form(`Editar: ${esc(f.nome)}`,[...fFields(f),{k:'status',l:'St
  ['nome','patrimonio','serie','marca','modelo','obs','status'].forEach(k=>{if((f[k]??'')!==v[k]){diffs.push([k,f[k],v[k]]);n[k]=v[k]}});
  if(!diffs.length)return'Nada foi alterado.';const {error}=await sb.from('ferramentas').update(n).eq('id',f.id);if(error)throw error;
  await logEdit('ferramentas',f.nome+(f.patrimonio?' ('+f.patrimonio+')':''),diffs);toast('Edição registrada ✔')})}
-const lFields=l=>[{k:'nome',l:'Nome do local',value:l?.nome},{k:'tipo',l:'Tipo',t:'select',value:l?.tipo||'estacao',opts:Object.entries(TP)},
+const lFields=l=>[{k:'nome',l:'Nome do local',value:l?.nome},{k:'grupo',l:'Grupo',t:'select',value:l?.grupo,opts:(l?.tipo==='estoque'?[GR_CIMI]:GRUPOS).map(g=>[g,g])},
  {k:'armazem',l:'Armazém (sigla)',value:l?.armazem},{k:'centro_custo',l:'Centro de custo',value:l?.centro_custo}];
-function novoL(){form('Novo local',lFields(),'Cadastrar',async v=>{if(!v.nome)return'Informe o nome.';const {error}=await sb.from('locais').insert(v);if(error)throw error;toast('Local cadastrado ✔')})}
+function novoL(){form('Novo local',lFields(),'Cadastrar',async v=>{if(!v.nome)return'Informe o nome.';const {error}=await sb.from('locais').insert({...v,tipo:tipoDe(v.grupo)});if(error)throw error;toast('Local cadastrado ✔')})}
 function editL(l){form(`Editar: ${esc(l.nome)}`,[...lFields(l),pwField],'Salvar edição',async v=>{
  if(!await checkPw(v.senha))return'Senha incorreta.';const diffs=[],n={};
- ['nome','tipo','armazem','centro_custo'].forEach(k=>{if((l[k]??'')!==v[k]){diffs.push([k,l[k],v[k]]);n[k]=v[k]}});
- if(!diffs.length)return'Nada foi alterado.';const {error}=await sb.from('locais').update(n).eq('id',l.id);if(error)throw error;await logEdit('locais',l.nome,diffs);toast('Edição registrada ✔')})}
+ ['nome','grupo','armazem','centro_custo'].forEach(k=>{if((l[k]??'')!==v[k]){diffs.push([k,l[k],v[k]]);n[k]=v[k]}});
+ if(!diffs.length)return'Nada foi alterado.';if(n.grupo)n.tipo=tipoDe(n.grupo);const {error}=await sb.from('locais').update(n).eq('id',l.id);if(error)throw error;await logEdit('locais',l.nome,diffs);toast('Edição registrada ✔')})}
 function hist(f){const ms=D.m.filter(x=>x.ferramenta_id===f.id);const m=document.createElement('div');m.className='mask';m.addEventListener('click',e=>{if(e.target===m)m.remove()});
  m.innerHTML=`<div class="modal"><h3>Histórico: ${esc(f.nome)}</h3>${ms.map(x=>`<div class="tl"><span class="bd ${x.tipo}">${x.tipo.toUpperCase()}</span> <b>${esc(L(x.local_id)?.nome)}</b>
  <div class="m">${fmt(x.created_at)} · ${esc(x.pessoa)} · registrado por ${esc(x.usuario_nome)}</div>${x.obs?`<div>${esc(x.obs)}</div>`:''}
@@ -139,7 +143,7 @@ const act=(fn,id,arr)=>fn(arr.find(x=>x.id===id));
 function render(){
  const tabs=[['painel','🧰 Ferramentas'],['hist','🕘 Movimentações'],['locais','📍 Locais'],['edic','✏️ Edições']];
  $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas</h1><small>${esc(me.nome)} (${me.papel==='principal'?'principal':'correlato'})</small><button class="btn o s" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></header>
- <nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join('')}</nav><main>${{painel,hist:histView,locais,edic}[tab]()}</main>`;
+ <nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';q='';render()">${t[1]}</button>`).join('')}</nav><main>${{painel,hist:histView,locais,edic}[tab]()}</main>`;
  const s=$('#q');if(s){s.oninput=e=>{q=e.target.value;const p=e.target.selectionStart;render();const n=$('#q');n.focus();n.setSelectionRange(p,p)}}}
 function painel(){const c=k=>D.f.filter(x=>x.status===k).length;
  const list=D.f.filter(x=>(flt==='todos'||x.status===flt)&&(`${x.nome} ${x.patrimonio} ${x.marca} ${x.modelo} ${x.responsavel_atual} ${L(x.local_atual_id)?.nome}`).toLowerCase().includes(q.toLowerCase()));
@@ -155,8 +159,10 @@ function painel(){const c=k=>D.f.filter(x=>x.status===k).length;
 function histView(){return`<div class="tw"><table><tr><th>Quando</th><th>Tipo</th><th>Ferramenta</th><th>Local</th><th>Pessoa</th><th>Foto</th><th>Registrado por</th></tr>
  ${D.m.map(x=>`<tr><td>${fmt(x.created_at)}</td><td><span class="bd ${x.tipo}">${x.tipo}</span></td><td>${esc(F(x.ferramenta_id)?.nome)}<div class="m">${esc(F(x.ferramenta_id)?.patrimonio)}</div></td>
  <td>${esc(L(x.local_id)?.nome)}</td><td>${esc(x.pessoa)}</td><td><img class="ph" src="${x.foto_url}" onclick="foto('${x.foto_url}')"></td><td>${esc(x.usuario_nome)}</td></tr>`).join('')||'<tr><td colspan=7 class="m">Sem movimentações ainda.</td></tr>'}</table></div>`}
-function locais(){return`<div class="bar"><button class="btn" onclick="novoL()">+ Novo local</button></div><div class="tw"><table><tr><th>Local</th><th>Tipo</th><th>Armazém</th><th>Centro de custo</th><th></th></tr>
- ${D.l.map(l=>`<tr><td><b>${esc(l.nome)}</b></td><td>${TP[l.tipo]}</td><td>${esc(l.armazem||'')}</td><td>${esc(l.centro_custo||'')}</td><td><button class="btn s o" onclick="act(editL,'${l.id}',D.l)">✏️ Editar</button></td></tr>`).join('')}</table></div>`}
+function locais(){const t=q.toLowerCase();const lista=D.l.filter(l=>`${l.nome} ${l.armazem} ${l.centro_custo}`.toLowerCase().includes(t));
+ const sec=g=>{const r=lista.filter(l=>(l.grupo||'Sem grupo')===g);return r.length?`<h3 style="margin:20px 0 8px;color:var(--gd)">${esc(g)} <span class="m">(${r.length})</span></h3><div class="tw"><table><tr><th>Local</th><th>Armazém</th><th>Centro de custo</th><th></th></tr>
+ ${r.map(l=>`<tr><td><b>${esc(l.nome)}</b></td><td>${esc(l.armazem||'')}</td><td>${esc(l.centro_custo||'')}</td><td style="text-align:right"><button class="btn s o" onclick="act(editL,'${l.id}',D.l)">✏️ Editar</button></td></tr>`).join('')}</table></div>`:''};
+ return`<div class="bar"><input id="q" placeholder="🔎 Buscar local..." value="${esc(q)}"><button class="btn" onclick="novoL()">+ Novo local</button></div>${[GR_CIMI,...GRUPOS,'Sem grupo'].map(sec).join('')||'<p class="m">Nenhum local encontrado.</p>'}`}
 function edic(){return`<div class="tw"><table><tr><th>Quando</th><th>Quem editou</th><th>Onde</th><th>Campo</th><th>De → Para</th><th>Validação</th></tr>
  ${D.e.map(x=>`<tr><td>${fmt(x.created_at)}</td><td>${esc(x.usuario_nome)}</td><td>${esc(x.tabela)}: ${esc(x.registro)}</td><td>${esc(x.campo)}</td><td>${esc(x.valor_antigo||'∅')} → <b>${esc(x.valor_novo||'∅')}</b></td><td class="m">${esc(x.nota)}</td></tr>`).join('')||'<tr><td colspan=6 class="m">Nenhuma edição registrada.</td></tr>'}</table></div>`}
 start();
