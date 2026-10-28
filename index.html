@@ -55,11 +55,13 @@ const cimi=()=>D.l.find(x=>x.tipo==='estoque');
 
 // ---------- Login ----------
 function loginView(msg=''){ $('#app').innerHTML=`<div class="login"><h2>🛠️ CIMI · Ferramentas</h2>
-<label>E-mail</label><input id="em" type="email"><label>Senha</label><input id="pw" type="password">
+<label for="em">E-mail</label><input id="em" name="username" type="email" autocomplete="username">
+<label for="pw">Senha</label><div style="display:flex;gap:6px"><input id="pw" name="password" type="password" autocomplete="current-password" style="flex:1"><button type="button" class="btn o" id="ver" title="Mostrar senha">👁</button></div>
 <p class="err">${msg}</p><button class="btn" style="width:100%" id="go">Entrar</button></div>`;
- const go=async()=>{const {error}=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});
-  if(error)return loginView('E-mail ou senha inválidos.');start()};
- $('#go').onclick=go;$('#pw').onkeydown=e=>e.key==='Enter'&&go()}
+ const go=async()=>{const b=$('#go');b.disabled=true;const {error}=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});
+  if(error){b.disabled=false;return loginView('E-mail ou senha inválidos.')}start()};
+ $('#go').onclick=go;$('#pw').onkeydown=e=>e.key==='Enter'&&go();$('#em').onkeydown=e=>e.key==='Enter'&&$('#pw').focus();
+ $('#ver').onclick=()=>{const p=$('#pw');p.type=p.type==='password'?'text':'password';p.focus()};$('#em').focus()}
 async function start(){
  const {data:{session}}=await sb.auth.getSession(); if(!session)return loginView();
  const {data:p}=await sb.from('profiles').select('*').eq('id',session.user.id).single();
