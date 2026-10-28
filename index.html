@@ -79,21 +79,29 @@ function trocarView(msg=''){$('#app').innerHTML=`<div class="login"><h2>🔒 Def
 <button class="btn" style="width:100%" id="sv">Salvar e entrar</button><button class="btn o" style="width:100%;margin-top:8px" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></div>`;
  $('#sv').onclick=async()=>{const a=$('#n1').value,b=$('#n2').value;if(a.length<6)return trocarView('Use ao menos 6 caracteres.');if(a!==b)return trocarView('As senhas não conferem.');
   const {error}=await sb.auth.updateUser({password:a});if(error)return trocarView(error.message);
-  await sb.from('profiles').update({trocar_senha:false}).eq('id',me.id);start()}}
+  await api('senha_trocada').catch(()=>{});await sb.from('profiles').update({trocar_senha:false}).eq('id',me.id);start()}}
 function esqueci(){form('Recuperar senha',[{k:'login',l:'Login (e-mail de acesso)'},{k:'email',l:'E-mail cadastrado, para receber a senha provisória',t:'email'}],'Enviar',async v=>{
  if(!v.login||!v.email)return'Preencha os dois campos.';await api('recuperar',v);toast('Se os dados conferirem, a senha provisória foi enviada.')})}
 const rota=x=>{const c=cimi()?.id;return x.tipo==='retirada'?[c,x.local_id]:[x.local_id,c]};
 const rotaTd=x=>{const [a,b]=rota(x);return`<td>${esc(L(a)?.nome||'—')}</td><td>${esc(L(b)?.nome||'—')}</td>`};
-let AC=null;
-async function carregaAC(){try{AC=(await api('listar')).usuarios}catch(e){AC=[];toast('Erro: '+e.message)}render()}
+const dd=d=>{const t=new Date(d);return new Date(t.getFullYear(),t.getMonth(),t.getDate())};
+function dias(x){const prox=D.m.filter(y=>y.ferramenta_id===x.ferramenta_id&&new Date(y.created_at)>new Date(x.created_at)).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at))[0];
+ const fim=prox?new Date(prox.created_at):new Date(),n=Math.round((dd(fim)-dd(x.created_at))/864e5);
+ return`<b>${n}</b> dia${n===1?'':'s'}${prox?'':' <span class="pill u">até hoje</span>'}`}
+function dataMov(id){const m=D.m.find(x=>x.id===id),d=new Date(m.created_at),loc=new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16);
+ form(`Alterar data: ${esc(F(m.ferramenta_id)?.nome||'')} (${m.tipo})`,[{k:'data',l:'Data e hora reais da movimentação',t:'datetime-local',value:loc},pwField],'Salvar data',async v=>{
+  if(!v.data)return'Informe a data.';const nd=new Date(v.data);if(nd>new Date())return'A data não pode ser futura.';
+  await api('alterar_data',{id,data:nd.toISOString(),senha:v.senha});toast('Data alterada ✔')})}
+let AC=null,ACerr='';
+async function carregaAC(){try{AC=(await api('listar')).usuarios;ACerr=''}catch(e){AC=[];ACerr=e.message}render()}
 function acessos(){if(AC===null){carregaAC();return'<p class="m">Carregando acessos…</p>'}
  const t=q.toLowerCase(),r=AC.filter(u=>`${u.nome} ${u.email}`.toLowerCase().includes(t));
- return`<div class="card m" style="margin-bottom:12px">🔒 As senhas ficam criptografadas e ninguém consegue lê-las (nem o administrador). Aqui você <b>define uma senha provisória</b>: ela aparece uma única vez e o usuário é obrigado a trocá-la no próximo acesso.</div>
+ return`<div class="card m" style="margin-bottom:12px">🔒 Senhas que o <strong>próprio usuário</strong> escolheu ficam criptografadas e não podem ser vistas por ninguém, só redefinidas. Já a <strong>senha provisória</strong> (a que você define ou a enviada por e-mail) fica visível aqui até o usuário trocá-la.</div>
  <div class="bar"><input id="q" placeholder="🔎 Buscar usuário ou login..." value="${esc(q)}"><button class="btn o" onclick="AC=null;render()">↻ Atualizar</button></div>
  <div class="tw"><table><tr><th>Usuário</th><th>Login</th><th>E-mail de recuperação</th><th>Papel</th><th>Senha</th><th>Último acesso</th><th>Ações</th></tr>
  ${r.map(u=>`<tr><td><b>${esc(u.nome)}</b></td><td>${esc(u.email)}</td><td>${esc(u.email_contato||'—')}</td><td>${esc(u.papel)}</td>
- <td>${u.papel==='principal'?'—':u.trocar_senha?'<span class="bd em_uso">Provisória</span>':'<span class="bd disponivel">Definida pelo usuário</span>'}</td><td>${u.ultimo_acesso?fmt(u.ultimo_acesso):'nunca'}</td>
- <td class="acts"><button class="btn s y" onclick="novaSenha('${u.id}')">🔑 Nova senha</button><button class="btn s o" onclick="emailAC('${u.id}')">✉️ E-mail</button></td></tr>`).join('')||'<tr><td colspan=7 class="m">Nenhum usuário.</td></tr>'}</table></div>`}
+ <td>${u.papel==='principal'?'—':u.senha_provisoria?`<span class="bd em_uso">Provisória</span> <button class="btn s o" onclick="verSenha('${u.id}')">👁 Ver</button>`:u.trocar_senha?'<span class="bd em_uso">Provisória</span><div class="m">não registrada</div>':'<span class="bd disponivel">Definida pelo usuário</span><div class="m">oculta (só dá para redefinir)</div>'}</td><td>${u.ultimo_acesso?fmt(u.ultimo_acesso):'nunca'}</td>
+ <td class="acts"><button class="btn s y" onclick="novaSenha('${u.id}')">🔑 Nova senha</button><button class="btn s o" onclick="emailAC('${u.id}')">✉️ E-mail</button></td></tr>`).join('')||`<tr><td colspan=7 class="${ACerr?'err':'m'}">${ACerr?'Não foi possível carregar os usuários: '+esc(ACerr)+'. Confirme que a função "acessos" foi publicada no Supabase e clique em ↻ Atualizar.':'Nenhum usuário.'}</td></tr>`}</table></div>`}
 function novaSenha(id){const u=AC.find(x=>x.id===id),a='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
  const g=Array.from(crypto.getRandomValues(new Uint8Array(8)),b=>a[b%a.length]).join('');
  form(`Nova senha: ${esc(u.nome)}`,[{k:'nova',l:'Senha provisória (gerada automaticamente, pode editar)',value:g},
@@ -102,6 +110,7 @@ function novaSenha(id){const u=AC.find(x=>x.id===id),a='abcdefghjkmnpqrstuvwxyzA
   if(v.nova.length<6)return'Mínimo de 6 caracteres.';if(!await checkPw(v.minha))return'Sua senha está incorreta.';
   const r=await api('definir_senha',{id,senha:v.nova,enviar:v.enviar==='1'});AC=null;
   alert(`Senha provisória de ${u.nome}:\n\n${v.nova}\n\nO usuário deverá trocá-la no próximo acesso.${r.aviso?'\n\n⚠️ '+r.aviso:''}`)})}
+function verSenha(id){const u=AC.find(x=>x.id===id);alert(`Senha provisória de ${u.nome}:\n\n${u.senha_provisoria}`)}
 function emailAC(id){const u=AC.find(x=>x.id===id);form(`E-mail de recuperação: ${esc(u.nome)}`,[{k:'email',l:'E-mail',t:'email',value:u.email_contato}],'Salvar',async v=>{
  await api('definir_email',{id,email:v.email});AC=null;toast('E-mail salvo ✔')})}
 
@@ -225,9 +234,9 @@ function painel(){const c=k=>D.f.filter(x=>x.status===k).length;
  <td><span class="bd ${f.status}">${ST[f.status]}</span></td><td>${esc(L(f.local_atual_id)?.nome||'—')}</td><td>${esc(f.responsavel_atual||'—')}</td>
  <td class="acts">${f.status==='disponivel'?`<button class="btn s y" onclick="act(retirar,'${f.id}',D.f)">Retirar</button>`:''}${f.status==='em_uso'?`<button class="btn s" onclick="act(entregar,'${f.id}',D.f)">Entregar</button>`:''}
  <button class="btn s o" onclick="act(hist,'${f.id}',D.f)">Histórico</button><button class="btn s o" onclick="act(editF,'${f.id}',D.f)">✏️</button></td></tr>`).join('')||'<tr><td colspan=6 class="m">Nenhuma ferramenta encontrada.</td></tr>'}</table></div>`}
-function histView(){return`<div class="tw"><table><tr><th>Quando</th><th>Tipo</th><th>Ferramenta</th><th>Saiu de</th><th>Foi para</th><th>Pessoa</th><th>Foto</th><th>Registrado por</th></tr>
- ${D.m.map(x=>`<tr><td>${fmt(x.created_at)}</td><td><span class="bd ${x.tipo}">${x.tipo}</span></td><td>${esc(F(x.ferramenta_id)?.nome)}<div class="m">${esc(F(x.ferramenta_id)?.patrimonio)}</div></td>
- ${rotaTd(x)}<td>${esc(x.pessoa)}</td><td><img class="ph" src="${x.foto_url}" onclick="foto('${x.foto_url}')"></td><td>${esc(x.usuario_nome)}</td></tr>`).join('')||'<tr><td colspan=8 class="m">Sem movimentações ainda.</td></tr>'}</table></div>`}
+function histView(){return`<div class="tw"><table><tr><th>Quando</th><th>Tipo</th><th>Ferramenta</th><th>Saiu de</th><th>Foi para</th><th>Dias no destino</th><th>Pessoa</th><th>Foto</th><th>Registrado por</th></tr>
+ ${D.m.map(x=>`<tr><td>${fmt(x.created_at)}<div><button class="btn s o" title="Alterar data (pede senha)" onclick="dataMov('${x.id}')">📅 Data</button></div></td><td><span class="bd ${x.tipo}">${x.tipo}</span></td><td>${esc(F(x.ferramenta_id)?.nome)}<div class="m">${esc(F(x.ferramenta_id)?.patrimonio)}</div></td>
+ ${rotaTd(x)}<td>${dias(x)}</td><td>${esc(x.pessoa)}</td><td><img class="ph" src="${x.foto_url}" onclick="foto('${x.foto_url}')"></td><td>${esc(x.usuario_nome)}</td></tr>`).join('')||'<tr><td colspan=9 class="m">Sem movimentações ainda.</td></tr>'}</table></div>`}
 const GV={[GR_CIMI]:['🏠','#2e9e4f'],'Estações BRT Norte Sul':['🚏','#2b6cb0'],'Estações BRT Leste Oeste':['🚏','#7b4fc4'],'Terminais Estações BRT Leste - Oeste':['🚌','#0f8f8f'],'Terminais Estações BRT Norte - Sul':['🚌','#c2410c'],'Terminais Primitivos':['🏛️','#8a6d3b'],"PA'S":['🏢','#d6457a'],'Sem grupo':['📍','#6b7a71']};
 const usoEm=id=>D.f.filter(f=>f.status==='em_uso'&&f.local_atual_id===id);
 function verL(id){const l=L(id),us=usoEm(id),ms=D.m.filter(x=>x.local_id===id).slice(0,8);const m=document.createElement('div');m.className='mask';m.addEventListener('click',e=>{if(e.target===m)m.remove()});
