@@ -56,7 +56,7 @@ const SUPABASE_URL='https://qviqhcntabtuyisdhdqo.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2aXFoY250YWJ0dXlpc2RoZHFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMTA3NDUsImV4cCI6MjEwODc4Njc0NX0.d86r1LH9dKXg6q9geSD-xJ2IEDPSZAlzsSR8F2EJ7bk';
 // ==================================================================
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-let me=null,D={f:[],l:[],m:[],e:[]},tab='painel',q='',flt='todos';
+let me=null,D={f:[],l:[],m:[],e:[],p:[],fn:[]},tab='painel',q='',flt='todos';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=d=>new Date(d).toLocaleString('pt-BR');
@@ -65,7 +65,7 @@ let gSel='todos';const GR_CIMI='CIMI (Estoque)';
 const GRUPOS=['Estações BRT Norte Sul','Estações BRT Leste Oeste','Terminais Estações BRT Leste - Oeste','Terminais Estações BRT Norte - Sul','Terminais Primitivos',"PA'S"];
 const tipoDe=g=>g===GR_CIMI?'estoque':g.startsWith('Terminais')?'terminal':g==="PA'S"?'pa':'estacao';
 function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',3000)}
-const L=id=>D.l.find(x=>x.id===id),F=id=>D.f.find(x=>x.id===id);
+const L=id=>D.l.find(x=>x.id===id),F=id=>D.f.find(x=>x.id===id),FN=id=>D.fn.find(x=>x.id===id);
 const cimi=()=>D.l.find(x=>x.tipo==='estoque');
 
 // ---------- Login ----------
@@ -84,16 +84,16 @@ async function start(){
  await load(); render();
  sb.channel('rt').on('postgres_changes',{event:'*',schema:'public'},async()=>{await load();render()}).subscribe()}
 async function load(){
- const [f,l,m,e]=await Promise.all([sb.from('ferramentas').select('*').order('nome'),sb.from('locais').select('*').order('nome'),
-  sb.from('movimentacoes').select('*').order('created_at',{ascending:false}).limit(500),sb.from('edicoes').select('*').order('created_at',{ascending:false}).limit(300)]);
- D={f:f.data||[],l:l.data||[],m:m.data||[],e:e.data||[]}}
+ const [f,l,m,e,pe,fu]=await Promise.all([sb.from('ferramentas').select('*').order('nome'),sb.from('locais').select('*').order('nome'),
+  sb.from('movimentacoes').select('*').order('created_at',{ascending:false}).limit(500),sb.from('edicoes').select('*').order('created_at',{ascending:false}).limit(300),sb.from('pessoas').select('*').order('nome'),sb.from('funcoes').select('*').order('nome')]);
+ D={f:f.data||[],l:l.data||[],m:m.data||[],e:e.data||[],p:pe.data||[],fn:fu.data||[]}}
 
 // ---------- Modal / formulário genérico ----------
 function form(title,fields,okLabel,onSubmit){
  const m=document.createElement('div');m.className='mask';
  const inp=f=>{const v=f.value??'';
-  if(f.t==='select'){const op=o=>`<option value="${esc(o[0])}" ${o[0]==v?'selected':''}>${esc(o[1])}</option>`;let h='',g=null;
-   f.opts.forEach(o=>{if(o[2]!==g){if(g!==null)h+='</optgroup>';g=o[2];if(g!==undefined)h+=`<optgroup label="${esc(g)}">`}h+=op(o)});if(g!==undefined&&g!==null)h+='</optgroup>';
+  if(f.t==='select'){const op=o=>`<option value="${esc(o[0])}" ${o[0]==v?'selected':''}>${esc(o[1])}</option>`;let h='',g=null,ab=false;
+   f.opts.forEach(o=>{if(o[2]!==g){if(ab){h+='</optgroup>';ab=false}g=o[2];if(g!==undefined){h+=`<optgroup label="${esc(g)}">`;ab=true}}h+=op(o)});if(ab)h+='</optgroup>';
    return`<select name="${f.k}">${h}</select>`}
   if(f.t==='file')return`<input type="file" name="${f.k}" accept="image/*" capture="environment">`;
   if(f.t==='area')return`<textarea name="${f.k}" rows="2">${esc(v)}</textarea>`;
@@ -119,16 +119,18 @@ async function logEdit(tabela,reg,diffs){await sb.from('edicoes').insert(diffs.m
  usuario_id:me.id,usuario_nome:me.nome,nota:'Edição feita mediante a senha de acesso'})))}
 
 // ---------- Ações ----------
+const pessoaFields=sel=>[{k:'pid',l:'👷 Pessoa',t:'select',value:sel,opts:[['','— Selecionar pessoa cadastrada —'],...D.p.filter(p=>p.ativo||p.id===sel).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')).map(p=>[p.id,p.nome,FN(p.funcao_id)?.nome||'Sem função'])]},{k:'outro',l:'Ou digite o nome (se não estiver cadastrada)'}];
+const quem=v=>{const p=D.p.find(x=>x.id===v.pid);return{p,nome:p?.nome||v.outro}};
 function retirar(f){const gi=x=>{const i=GRUPOS.indexOf(x.grupo);return i<0?99:i};const dest=D.l.filter(x=>x.tipo!=='estoque').sort((a,b)=>gi(a)-gi(b)||a.nome.localeCompare(b.nome));
  form(`Retirar: ${esc(f.nome)}`,[{k:'local',l:'Local de destino (onde será usada)',t:'select',opts:dest.map(x=>[x.id,x.nome,x.grupo||'Outros'])},
- {k:'pessoa',l:'Nome de quem está retirando'},{k:'foto',l:'📷 Foto de quem retirou (obrigatória)',t:'file'},{k:'obs',l:'Observação',t:'area'}],'Confirmar retirada',async v=>{
-  if(!v.pessoa||!v.foto)return'Informe o nome e tire a foto.';const url=await upload(v.foto,f.id);
-  let r=await sb.from('movimentacoes').insert({ferramenta_id:f.id,tipo:'retirada',local_id:v.local,pessoa:v.pessoa,foto_url:url,obs:v.obs,usuario_id:me.id,usuario_nome:me.nome});if(r.error)throw r.error;
-  r=await sb.from('ferramentas').update({status:'em_uso',local_atual_id:v.local,responsavel_atual:v.pessoa}).eq('id',f.id);if(r.error)throw r.error;toast('Retirada registrada ✔')})}
-function entregar(f){form(`Devolver ao CIMI: ${esc(f.nome)}`,[{k:'pessoa',l:'Nome de quem está entregando',value:f.responsavel_atual},
+ ...pessoaFields(),{k:'foto',l:'📷 Foto de quem retirou (obrigatória)',t:'file'},{k:'obs',l:'Observação',t:'area'}],'Confirmar retirada',async v=>{
+  const {p,nome}=quem(v);if(!nome||!v.foto)return'Escolha a pessoa e tire a foto.';const url=await upload(v.foto,f.id);
+  let r=await sb.from('movimentacoes').insert({ferramenta_id:f.id,tipo:'retirada',local_id:v.local,pessoa:nome,pessoa_id:p?.id||null,foto_url:url,obs:v.obs,usuario_id:me.id,usuario_nome:me.nome});if(r.error)throw r.error;
+  r=await sb.from('ferramentas').update({status:'em_uso',local_atual_id:v.local,responsavel_atual:nome}).eq('id',f.id);if(r.error)throw r.error;toast('Retirada registrada ✔')})}
+function entregar(f){form(`Devolver ao CIMI: ${esc(f.nome)}`,[...pessoaFields(D.p.find(x=>x.nome===f.responsavel_atual)?.id),
  {k:'foto',l:'📷 Foto de quem entregou (obrigatória)',t:'file'},{k:'obs',l:'Observação (estado da ferramenta)',t:'area'}],'Confirmar entrega',async v=>{
-  if(!v.pessoa||!v.foto)return'Informe o nome e tire a foto.';const url=await upload(v.foto,f.id);
-  let r=await sb.from('movimentacoes').insert({ferramenta_id:f.id,tipo:'entrega',local_id:f.local_atual_id,pessoa:v.pessoa,foto_url:url,obs:v.obs,usuario_id:me.id,usuario_nome:me.nome});if(r.error)throw r.error;
+  const {p,nome}=quem(v);if(!nome||!v.foto)return'Escolha a pessoa e tire a foto.';const url=await upload(v.foto,f.id);
+  let r=await sb.from('movimentacoes').insert({ferramenta_id:f.id,tipo:'entrega',local_id:f.local_atual_id,pessoa:nome,pessoa_id:p?.id||null,foto_url:url,obs:v.obs,usuario_id:me.id,usuario_nome:me.nome});if(r.error)throw r.error;
   r=await sb.from('ferramentas').update({status:'disponivel',local_atual_id:cimi()?.id,responsavel_atual:null}).eq('id',f.id);if(r.error)throw r.error;toast('Entrega registrada ✔')})}
 const fFields=f=>[{k:'nome',l:'Nome',value:f?.nome},{k:'patrimonio',l:'Patrimônio',value:f?.patrimonio},{k:'serie',l:'Nº de série',value:f?.serie},
  {k:'marca',l:'Marca',value:f?.marca},{k:'modelo',l:'Modelo',value:f?.modelo},{k:'obs',l:'Observação',t:'area',value:f?.obs}];
@@ -146,6 +148,22 @@ function editL(l){form(`Editar: ${esc(l.nome)}`,[...lFields(l),pwField],'Salvar 
  if(!await checkPw(v.senha))return'Senha incorreta.';const diffs=[],n={};
  ['nome','grupo','armazem','centro_custo'].forEach(k=>{if((l[k]??'')!==v[k]){diffs.push([k,l[k],v[k]]);n[k]=v[k]}});
  if(!diffs.length)return'Nada foi alterado.';if(n.grupo)n.tipo=tipoDe(n.grupo);const {error}=await sb.from('locais').update(n).eq('id',l.id);if(error)throw error;await logEdit('locais',l.nome,diffs);toast('Edição registrada ✔')})}
+const pFields=p=>[{k:'nome',l:'Nome completo',value:p?.nome},{k:'funcao_id',l:'Função',t:'select',value:p?.funcao_id,opts:D.fn.map(x=>[x.id,x.nome])},
+ ...(p?[{k:'ativo',l:'Situação',t:'select',value:String(p.ativo),opts:[['true','Ativo'],['false','Inativo (não aparece nas retiradas)']]}]:[])];
+function novaP(){if(!D.fn.length)return toast('Cadastre uma função primeiro.');form('Nova pessoa',pFields(),'Cadastrar',async v=>{if(!v.nome)return'Informe o nome.';
+ const {error}=await sb.from('pessoas').insert({nome:v.nome,funcao_id:v.funcao_id,ativo:true});if(error)throw error;toast('Pessoa cadastrada ✔')})}
+function editP(p){form(`Editar: ${esc(p.nome)}`,[...pFields(p),pwField],'Salvar edição',async v=>{
+ if(!await checkPw(v.senha))return'Senha incorreta.';const diffs=[],n={},at=v.ativo==='true';
+ if(p.nome!==v.nome){diffs.push(['nome',p.nome,v.nome]);n.nome=v.nome}
+ if(p.funcao_id!==v.funcao_id){diffs.push(['função',FN(p.funcao_id)?.nome,FN(v.funcao_id)?.nome]);n.funcao_id=v.funcao_id}
+ if(p.ativo!==at){diffs.push(['situação',p.ativo?'Ativo':'Inativo',at?'Ativo':'Inativo']);n.ativo=at}
+ if(!diffs.length)return'Nada foi alterado.';const {error}=await sb.from('pessoas').update(n).eq('id',p.id);if(error)throw error;await logEdit('pessoas',p.nome,diffs);toast('Edição registrada ✔')})}
+const dup=e=>e.code==='23505'?'Já existe uma função com esse nome.':null;
+function novaFn(){form('Nova função',[{k:'nome',l:'Nome da função (ex.: Eletricista)'}],'Cadastrar',async v=>{if(!v.nome)return'Informe o nome.';
+ const {error}=await sb.from('funcoes').insert({nome:v.nome});if(error)return dup(error)||Promise.reject(error);toast('Função cadastrada ✔')})}
+function editFn(x){form(`Editar função: ${esc(x.nome)}`,[{k:'nome',l:'Nome da função',value:x.nome},pwField],'Salvar edição',async v=>{
+ if(!await checkPw(v.senha))return'Senha incorreta.';if(!v.nome||v.nome===x.nome)return'Nada foi alterado.';
+ const {error}=await sb.from('funcoes').update({nome:v.nome}).eq('id',x.id);if(error)return dup(error)||Promise.reject(error);await logEdit('funcoes',x.nome,[['nome',x.nome,v.nome]]);toast('Edição registrada ✔')})}
 function hist(f){const ms=D.m.filter(x=>x.ferramenta_id===f.id);const m=document.createElement('div');m.className='mask';m.addEventListener('click',e=>{if(e.target===m)m.remove()});
  m.innerHTML=`<div class="modal"><h3>Histórico: ${esc(f.nome)}</h3>${ms.map(x=>`<div class="tl"><span class="bd ${x.tipo}">${x.tipo.toUpperCase()}</span> <b>${esc(L(x.local_id)?.nome)}</b>
  <div class="m">${fmt(x.created_at)} · ${esc(x.pessoa)} · registrado por ${esc(x.usuario_nome)}</div>${x.obs?`<div>${esc(x.obs)}</div>`:''}
@@ -154,9 +172,9 @@ const act=(fn,id,arr)=>fn(arr.find(x=>x.id===id));
 
 // ---------- Telas ----------
 function render(){
- const tabs=[['painel','🧰 Ferramentas'],['hist','🕘 Movimentações'],['locais','📍 Locais'],['edic','✏️ Edições']];
+ const tabs=[['painel','🧰 Ferramentas'],['hist','🕘 Movimentações'],['locais','📍 Locais'],['pessoas','👷 Pessoas'],['funcoes','🏷️ Funções'],['edic','✏️ Edições']];
  $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas</h1><small>${esc(me.nome)} (${me.papel==='principal'?'principal':'correlato'})</small><button class="btn o s" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></header>
- <nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';q='';render()">${t[1]}</button>`).join('')}</nav><main>${{painel,hist:histView,locais,edic}[tab]()}</main>`;
+ <nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';q='';render()">${t[1]}</button>`).join('')}</nav><main>${{painel,hist:histView,locais,pessoas,funcoes,edic}[tab]()}</main>`;
  const s=$('#q');if(s){s.oninput=e=>{q=e.target.value;const p=e.target.selectionStart;render();const n=$('#q');n.focus();n.setSelectionRange(p,p)}}}
 function painel(){const c=k=>D.f.filter(x=>x.status===k).length;
  const list=D.f.filter(x=>(flt==='todos'||x.status===flt)&&(`${x.nome} ${x.patrimonio} ${x.marca} ${x.modelo} ${x.responsavel_atual} ${L(x.local_atual_id)?.nome}`).toLowerCase().includes(q.toLowerCase()));
@@ -192,6 +210,22 @@ function locais(){const t=q.toLowerCase();const todos=[GR_CIMI,...GRUPOS,'Sem gr
   return`<div class="tile" style="--c:${c};animation-delay:${Math.min(i,12)*30}ms"><b>${esc(l.nome)}</b><div>${l.armazem?`<span class="pill">Armazém ${esc(l.armazem)}</span> `:''}${l.centro_custo?`<span class="pill">CC ${esc(l.centro_custo)}</span> `:''}${u?`<span class="pill u">🧰 ${u} em uso</span>`:'<span class="pill z">livre</span>'}</div>
   <div class="acts"><button class="btn s" onclick="verL('${l.id}')">👁 Detalhes</button><button class="btn s o" onclick="act(editL,'${l.id}',D.l)">✏️ Editar</button></div></div>`}).join('')}</div>`};
  return`<div class="gg">${cards}</div><div class="bar"><input id="q" placeholder="🔎 Buscar local por nome, armazém ou centro de custo..." value="${esc(q)}"><button class="btn" onclick="novoL()">+ Novo local</button></div>${todos.map(sec).join('')||'<p class="m">Nenhum local encontrado.</p>'}`}
+const FCOR=['#2b6cb0','#d6457a','#2e9e4f','#7b4fc4','#c2410c','#0f8f8f','#8a6d3b'];
+const fcor=id=>FCOR[Math.max(0,D.fn.findIndex(x=>x.id===id))%FCOR.length];
+let fSel='todas';
+function pessoas(){const t=q.toLowerCase();if(fSel!=='todas'&&!FN(fSel))fSel='todas';
+ const com=p=>D.f.filter(f=>f.status==='em_uso'&&f.responsavel_atual===p.nome).length;
+ const r=D.p.filter(p=>(fSel==='todas'||p.funcao_id===fSel)&&`${p.nome} ${FN(p.funcao_id)?.nome}`.toLowerCase().includes(t));
+ const chip=(id,n,c)=>`<button class="btn s ${fSel===id?'':'o'}" style="${fSel===id?`background:${c}`:`color:${c};border-color:${c}`}" onclick="fSel='${id}';render()">${esc(n)} (${id==='todas'?D.p.length:D.p.filter(p=>p.funcao_id===id).length})</button>`;
+ return`<div class="card" style="margin-bottom:12px"><div class="acts">${chip('todas','Todas as funções','#1d2a22')}${D.fn.map(x=>chip(x.id,x.nome,fcor(x.id))).join('')}</div></div>
+ <div class="bar"><input id="q" placeholder="🔎 Buscar pessoa ou função..." value="${esc(q)}"><button class="btn" onclick="novaP()">+ Nova pessoa</button></div>
+ <div class="lg">${r.map((p,i)=>{const c=fcor(p.funcao_id),n=com(p);return`<div class="tile" style="--c:${c};animation-delay:${Math.min(i,12)*30}ms;${p.ativo?'':'opacity:.55'}">
+  <div style="display:flex;gap:10px;align-items:center"><div style="width:40px;height:40px;border-radius:50%;background:${c};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800">${esc(p.nome.trim()[0]||'?')}</div><b>${esc(p.nome)}</b></div>
+  <div><span class="pill" style="background:${c};color:#fff">${esc(FN(p.funcao_id)?.nome||'Sem função')}</span> ${p.ativo?'':'<span class="pill">Inativo</span> '}${n?`<span class="pill u">🧰 ${n} com ele(a)</span>`:''}</div>
+  <div class="acts"><button class="btn s o" onclick="act(editP,'${p.id}',D.p)">✏️ Editar</button></div></div>`}).join('')||'<p class="m">Nenhuma pessoa encontrada.</p>'}</div>`}
+function funcoes(){return`<div class="bar"><div class="m" style="flex:1;align-self:center">Funções disponíveis para as pessoas cadastradas.</div><button class="btn" onclick="novaFn()">+ Nova função</button></div>
+ <div class="lg">${D.fn.map((x,i)=>{const c=fcor(x.id),n=D.p.filter(p=>p.funcao_id===x.id).length;return`<div class="tile" style="--c:${c};animation-delay:${i*30}ms"><b>🏷️ ${esc(x.nome)}</b><div><span class="pill">${n} ${n===1?'pessoa':'pessoas'}</span></div>
+  <div class="acts"><button class="btn s o" onclick="act(editFn,'${x.id}',D.fn)">✏️ Editar</button></div></div>`}).join('')}</div>`}
 function edic(){return`<div class="tw"><table><tr><th>Quando</th><th>Quem editou</th><th>Onde</th><th>Campo</th><th>De → Para</th><th>Validação</th></tr>
  ${D.e.map(x=>`<tr><td>${fmt(x.created_at)}</td><td>${esc(x.usuario_nome)}</td><td>${esc(x.tabela)}: ${esc(x.registro)}</td><td>${esc(x.campo)}</td><td>${esc(x.valor_antigo||'∅')} → <b>${esc(x.valor_novo||'∅')}</b></td><td class="m">${esc(x.nota)}</td></tr>`).join('')||'<tr><td colspan=6 class="m">Nenhuma edição registrada.</td></tr>'}</table></div>`}
 start();
