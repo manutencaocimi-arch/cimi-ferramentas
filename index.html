@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CIMI · Controle de Ferramentas</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{--g:#2e9e4f;--gd:#1f7a3a;--bg:#f2f5f3;--c:#fff;--t:#1d2a22;--m:#6b7a71;--b:#dde5e0;--r:#d64545;--o:#e08a1e;--bl:#2b6cb0}
+*{box-sizing:border-box}body{margin:0;font:15px system-ui,Segoe UI,Arial;background:var(--bg);color:var(--t)}
+header{background:var(--g);color:#fff;padding:12px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+header h1{font-size:18px;margin:0;flex:1}header small{opacity:.9}
+nav{display:flex;gap:6px;padding:10px 18px;background:#fff;border-bottom:1px solid var(--b);overflow-x:auto}
+nav button{border:0;background:none;padding:8px 14px;border-radius:20px;cursor:pointer;font-weight:600;color:var(--m);white-space:nowrap}
+nav button.on{background:var(--g);color:#fff}
+main{max-width:1150px;margin:0 auto;padding:16px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+.card{background:var(--c);border-radius:12px;padding:14px;border:1px solid var(--b)}
+.card b{font-size:28px;display:block}.card span{color:var(--m);font-size:13px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+input,select,textarea{width:100%;padding:10px;border:1px solid var(--b);border-radius:8px;font:inherit;background:#fff}
+.bar input{flex:1;min-width:180px;width:auto}.bar select{width:auto}
+.btn{background:var(--g);color:#fff;border:0;padding:9px 14px;border-radius:8px;font-weight:600;cursor:pointer}
+.btn.s{padding:6px 10px;font-size:13px}.btn.o{background:#fff;color:var(--g);border:1px solid var(--g)}.btn.r{background:var(--r)}.btn.y{background:var(--o)}.btn:disabled{opacity:.5}
+.tw{background:var(--c);border:1px solid var(--b);border-radius:12px;overflow:auto}
+table{width:100%;border-collapse:collapse}th,td{padding:10px;text-align:left;border-bottom:1px solid var(--b);vertical-align:middle}
+th{font-size:12px;text-transform:uppercase;color:var(--m);background:#f8faf9;position:sticky;top:0}
+.bd{padding:3px 9px;border-radius:12px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap}
+.disponivel{background:var(--g)}.em_uso{background:var(--o)}.baixa{background:#888}
+.retirada{background:var(--o)}.entrega{background:var(--bl)}
+.ph{width:56px;height:56px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid var(--b)}
+.mask{position:fixed;inset:0;background:#0007;display:flex;align-items:center;justify-content:center;padding:14px;z-index:9}
+.modal{background:#fff;border-radius:14px;padding:20px;width:100%;max-width:480px;max-height:92vh;overflow:auto}
+.modal h3{margin:0 0 12px}label{display:block;font-size:13px;font-weight:600;margin:10px 0 4px}
+.err{color:var(--r);font-size:13px;margin-top:8px}.m{color:var(--m);font-size:13px}
+.login{max-width:360px;margin:12vh auto;background:#fff;padding:26px;border-radius:14px;border:1px solid var(--b)}
+.login h2{margin-top:0;color:var(--gd)}.acts{display:flex;gap:6px;flex-wrap:wrap}
+.tl{border-left:3px solid var(--b);padding-left:12px;margin:10px 0}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:8px;z-index:20;display:none}
+</style></head><body>
+<div id="app"></div><div id="toast"></div>
+<script>
+// ====== CONFIGURAÇÃO (cole os dados do seu projeto Supabase) ======
+const SUPABASE_URL='https://qviqhcntabtuyisdhdqo.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2aXFoY250YWJ0dXlpc2RoZHFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMTA3NDUsImV4cCI6MjEwODc4Njc0NX0.d86r1LH9dKXg6q9geSD-xJ2IEDPSZAlzsSR8F2EJ7bk';
+// ==================================================================
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let me=null,D={f:[],l:[],m:[],e:[]},tab='painel',q='',flt='todos';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=d=>new Date(d).toLocaleString('pt-BR');
+const ST={disponivel:'Disponível (CIMI)',em_uso:'Em uso',baixa:'Baixa'};
+const TP={estoque:'Estoque',estacao:'Estação',terminal:'Terminal',pa:'PA'};
+function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',3000)}
+const L=id=>D.l.find(x=>x.id===id),F=id=>D.f.find(x=>x.id===id);
+const cimi=()=>D.l.find(x=>x.tipo==='estoque');
+
+// ---------- Login ----------
+function loginView(msg=''){ $('#app').innerHTML=`<div class="login"><h2>🛠️ CIMI · Ferramentas</h2>
+<label>E-mail</label><input id="em" type="email"><label>Senha</label><input id="pw" type="password">
+<p class="err">${msg}</p><button class="btn" style="width:100%" id="go">Entrar</button></div>`;
+ const go=async()=>{const {error}=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});
+  if(error)return loginView('E-mail ou senha inválidos.');start()};
+ $('#go').onclick=go;$('#pw').onkeydown=e=>e.key==='Enter'&&go()}
+async function start(){
+ const {data:{session}}=await sb.auth.getSession(); if(!session)return loginView();
+ const {data:p}=await sb.from('profiles').select('*').eq('id',session.user.id).single();
+ me={id:session.user.id,email:session.user.email,nome:p?.nome||session.user.email,papel:p?.papel||'correlato'};
+ await load(); render();
+ sb.channel('rt').on('postgres_changes',{event:'*',schema:'public'},async()=>{await load();render()}).subscribe()}
+async function load(){
+ const [f,l,m,e]=await Promise.all([sb.from('ferramentas').select('*').order('nome'),sb.from('locais').select('*').order('nome'),
+  sb.from('movimentacoes').select('*').order('created_at',{ascending:false}).limit(500),sb.from('edicoes').select('*').order('created_at',{ascending:false}).limit(300)]);
+ D={f:f.data||[],l:l.data||[],m:m.data||[],e:e.data||[]}}
+
+// ---------- Modal / formulário genérico ----------
+function form(title,fields,okLabel,onSubmit){
+ const m=document.createElement('div');m.className='mask';
+ const inp=f=>{const v=f.value??'';
+  if(f.t==='select')return`<select name="${f.k}">${f.opts.map(o=>`<option value="${esc(o[0])}" ${o[0]==v?'selected':''}>${esc(o[1])}</option>`).join('')}</select>`;
+  if(f.t==='file')return`<input type="file" name="${f.k}" accept="image/*" capture="environment">`;
+  if(f.t==='area')return`<textarea name="${f.k}" rows="2">${esc(v)}</textarea>`;
+  return`<input name="${f.k}" type="${f.t||'text'}" value="${esc(v)}" autocomplete="off">`};
+ m.innerHTML=`<div class="modal"><h3>${title}</h3>${fields.map(f=>`<label>${f.l}</label>${inp(f)}`).join('')}<div class="err"></div>
+ <div class="acts" style="margin-top:14px"><button class="btn" id="ok">${okLabel}</button><button class="btn o" id="no">Cancelar</button></div></div>`;
+ document.body.appendChild(m);const c=()=>m.remove();m.querySelector('#no').onclick=c;
+ m.querySelector('#ok').onclick=async e=>{const b=e.target;const v={};
+  fields.forEach(f=>{const el=m.querySelector(`[name=${f.k}]`);v[f.k]=f.t==='file'?el.files[0]:el.value.trim()});
+  b.disabled=true;m.querySelector('.err').textContent='';
+  try{const r=await onSubmit(v);if(r){m.querySelector('.err').textContent=r;b.disabled=false}else c()}
+  catch(x){m.querySelector('.err').textContent='Erro: '+(x.message||x);b.disabled=false}}}
+const pwField={k:'senha',l:'🔒 Sua senha de acesso (obrigatória para editar)',t:'password'};
+async function checkPw(s){if(!s)return false;const {error}=await sb.auth.signInWithPassword({email:me.email,password:s});return !error}
+function foto(url){if(!url)return'';const m=document.createElement('div');m.className='mask';m.onclick=()=>m.remove();
+ m.innerHTML=`<img src="${url}" style="max-width:100%;max-height:92vh;border-radius:10px">`;document.body.appendChild(m)}
+async function shrink(file){return new Promise(res=>{const i=new Image();i.onload=()=>{const k=Math.min(1,900/Math.max(i.width,i.height));
+ const c=document.createElement('canvas');c.width=i.width*k;c.height=i.height*k;c.getContext('2d').drawImage(i,0,0,c.width,c.height);c.toBlob(res,'image/jpeg',.75)};i.src=URL.createObjectURL(file)})}
+async function upload(file,fid){const b=await shrink(file),p=`${fid}/${Date.now()}.jpg`;
+ const {error}=await sb.storage.from('fotos').upload(p,b,{contentType:'image/jpeg'});if(error)throw error;
+ return sb.storage.from('fotos').getPublicUrl(p).data.publicUrl}
+async function logEdit(tabela,reg,diffs){await sb.from('edicoes').insert(diffs.map(d=>({tabela,registro:reg,campo:d[0],valor_antigo:String(d[1]??''),valor_novo:String(d[2]??''),
+ usuario_id:me.id,usuario_nome:me.nome,nota:'Edição feita mediante a senha de acesso'})))}
+
+// ---------- Ações ----------
+function retirar(f){const dest=D.l.filter(x=>x.tipo!=='estoque');
+ form(`Retirar: ${esc(f.nome)}`,[{k:'local',l:'Local de destino (onde será usada)',t:'select',opts:dest.map(x=>[x.id,x.nome])},
+ {k:'pessoa',l:'Nome de quem está retirando'},{k:'foto',l:'📷 Foto de quem retirou (obrigatória)',t:'file'},{k:'obs',l:'Observação',t:'area'}],'Confirmar retirada',async v=>{
+  if(!v.pessoa||!v.foto)return'Informe o nome e tire a foto.';const url=await upload(v.foto,f.id);
+  let r=await sb.from('movimentacoes').insert({ferramenta_id:f.id,tipo:'retirada',local_id:v.local,pessoa:v.pessoa,foto_url:url,obs:v.obs,usuario_id:me.id,usuario_nome:me.nome});if(r.error)throw r.error;
+  r=await sb.from('ferramentas').update({status:'em_uso',local_atual_id:v.local,responsavel_atual:v.pessoa}).eq('id',f.id);if(r.error)throw r.error;toast('Retirada registrada ✔')})}
+function entregar(f){form(`Devolver ao CIMI: ${esc(f.nome)}`,[{k:'pessoa',l:'Nome de quem está entregando',value:f.responsavel_atual},
+ {k:'foto',l:'📷 Foto de quem entregou (obrigatória)',t:'file'},{k:'obs',l:'Observação (estado da ferramenta)',t:'area'}],'Confirmar entrega',async v=>{
+  if(!v.pessoa||!v.foto)return'Informe o nome e tire a foto.';const url=await upload(v.foto,f.id);
+  let r=await sb.from('movimentacoes').insert({ferramenta_id:f.id,tipo:'entrega',local_id:f.local_atual_id,pessoa:v.pessoa,foto_url:url,obs:v.obs,usuario_id:me.id,usuario_nome:me.nome});if(r.error)throw r.error;
+  r=await sb.from('ferramentas').update({status:'disponivel',local_atual_id:cimi()?.id,responsavel_atual:null}).eq('id',f.id);if(r.error)throw r.error;toast('Entrega registrada ✔')})}
+const fFields=f=>[{k:'nome',l:'Nome',value:f?.nome},{k:'patrimonio',l:'Patrimônio',value:f?.patrimonio},{k:'serie',l:'Nº de série',value:f?.serie},
+ {k:'marca',l:'Marca',value:f?.marca},{k:'modelo',l:'Modelo',value:f?.modelo},{k:'obs',l:'Observação',t:'area',value:f?.obs}];
+function novaF(){form('Nova ferramenta',fFields(),'Cadastrar',async v=>{if(!v.nome)return'Informe o nome.';
+ const {error}=await sb.from('ferramentas').insert({...v,status:'disponivel',local_atual_id:cimi()?.id});if(error)throw error;toast('Cadastrada ✔')})}
+function editF(f){form(`Editar: ${esc(f.nome)}`,[...fFields(f),{k:'status',l:'Status',t:'select',value:f.status,opts:Object.entries(ST)},pwField],'Salvar edição',async v=>{
+ if(!await checkPw(v.senha))return'Senha incorreta.';const diffs=[];const n={};
+ ['nome','patrimonio','serie','marca','modelo','obs','status'].forEach(k=>{if((f[k]??'')!==v[k]){diffs.push([k,f[k],v[k]]);n[k]=v[k]}});
+ if(!diffs.length)return'Nada foi alterado.';const {error}=await sb.from('ferramentas').update(n).eq('id',f.id);if(error)throw error;
+ await logEdit('ferramentas',f.nome+(f.patrimonio?' ('+f.patrimonio+')':''),diffs);toast('Edição registrada ✔')})}
+const lFields=l=>[{k:'nome',l:'Nome do local',value:l?.nome},{k:'tipo',l:'Tipo',t:'select',value:l?.tipo||'estacao',opts:Object.entries(TP)},
+ {k:'armazem',l:'Armazém (sigla)',value:l?.armazem},{k:'centro_custo',l:'Centro de custo',value:l?.centro_custo}];
+function novoL(){form('Novo local',lFields(),'Cadastrar',async v=>{if(!v.nome)return'Informe o nome.';const {error}=await sb.from('locais').insert(v);if(error)throw error;toast('Local cadastrado ✔')})}
+function editL(l){form(`Editar: ${esc(l.nome)}`,[...lFields(l),pwField],'Salvar edição',async v=>{
+ if(!await checkPw(v.senha))return'Senha incorreta.';const diffs=[],n={};
+ ['nome','tipo','armazem','centro_custo'].forEach(k=>{if((l[k]??'')!==v[k]){diffs.push([k,l[k],v[k]]);n[k]=v[k]}});
+ if(!diffs.length)return'Nada foi alterado.';const {error}=await sb.from('locais').update(n).eq('id',l.id);if(error)throw error;await logEdit('locais',l.nome,diffs);toast('Edição registrada ✔')})}
+function hist(f){const ms=D.m.filter(x=>x.ferramenta_id===f.id);const m=document.createElement('div');m.className='mask';m.onclick=e=>e.target===m&&m.remove();
+ m.innerHTML=`<div class="modal"><h3>Histórico: ${esc(f.nome)}</h3>${ms.map(x=>`<div class="tl"><span class="bd ${x.tipo}">${x.tipo.toUpperCase()}</span> <b>${esc(L(x.local_id)?.nome)}</b>
+ <div class="m">${fmt(x.created_at)} · ${esc(x.pessoa)} · registrado por ${esc(x.usuario_nome)}</div>${x.obs?`<div>${esc(x.obs)}</div>`:''}
+ <img class="ph" src="${x.foto_url}" onclick="foto('${x.foto_url}')"></div>`).join('')||'<p class="m">Sem movimentações.</p>'}<button class="btn o" onclick="this.closest('.mask').remove()">Fechar</button></div>`;document.body.appendChild(m)}
+const act=(fn,id,arr)=>fn(arr.find(x=>x.id===id));
+
+// ---------- Telas ----------
+function render(){
+ const tabs=[['painel','🧰 Ferramentas'],['hist','🕘 Movimentações'],['locais','📍 Locais'],['edic','✏️ Edições']];
+ $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas</h1><small>${esc(me.nome)} (${me.papel==='principal'?'principal':'correlato'})</small><button class="btn o s" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></header>
+ <nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join('')}</nav><main>${{painel,hist:histView,locais,edic}[tab]()}</main>`;
+ const s=$('#q');if(s){s.oninput=e=>{q=e.target.value;const p=e.target.selectionStart;render();const n=$('#q');n.focus();n.setSelectionRange(p,p)}}}
+function painel(){const c=k=>D.f.filter(x=>x.status===k).length;
+ const list=D.f.filter(x=>(flt==='todos'||x.status===flt)&&(`${x.nome} ${x.patrimonio} ${x.marca} ${x.modelo} ${x.responsavel_atual} ${L(x.local_atual_id)?.nome}`).toLowerCase().includes(q.toLowerCase()));
+ return`<div class="cards"><div class="card"><b>${D.f.length}</b><span>Total</span></div><div class="card"><b style="color:var(--g)">${c('disponivel')}</b><span>Disponíveis no CIMI</span></div>
+ <div class="card"><b style="color:var(--o)">${c('em_uso')}</b><span>Em uso nos locais</span></div><div class="card"><b style="color:#888">${c('baixa')}</b><span>Baixa</span></div></div>
+ <div class="bar"><input id="q" placeholder="🔎 Buscar ferramenta, patrimônio, local, pessoa..." value="${esc(q)}"><select onchange="flt=this.value;render()">${[['todos','Todos'],...Object.entries(ST)].map(o=>`<option value="${o[0]}" ${flt===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select>
+ <button class="btn" onclick="novaF()">+ Nova ferramenta</button></div>
+ <div class="tw"><table><tr><th>Ferramenta</th><th>Patrimônio</th><th>Status</th><th>Local atual</th><th>Com quem</th><th>Ações</th></tr>
+ ${list.map(f=>`<tr><td><b>${esc(f.nome)}</b><div class="m">${esc([f.marca,f.modelo].filter(Boolean).join(' · '))}</div></td><td>${esc(f.patrimonio||'—')}</td>
+ <td><span class="bd ${f.status}">${ST[f.status]}</span></td><td>${esc(L(f.local_atual_id)?.nome||'—')}</td><td>${esc(f.responsavel_atual||'—')}</td>
+ <td class="acts">${f.status==='disponivel'?`<button class="btn s y" onclick="act(retirar,'${f.id}',D.f)">Retirar</button>`:''}${f.status==='em_uso'?`<button class="btn s" onclick="act(entregar,'${f.id}',D.f)">Entregar</button>`:''}
+ <button class="btn s o" onclick="act(hist,'${f.id}',D.f)">Histórico</button><button class="btn s o" onclick="act(editF,'${f.id}',D.f)">✏️</button></td></tr>`).join('')||'<tr><td colspan=6 class="m">Nenhuma ferramenta encontrada.</td></tr>'}</table></div>`}
+function histView(){return`<div class="tw"><table><tr><th>Quando</th><th>Tipo</th><th>Ferramenta</th><th>Local</th><th>Pessoa</th><th>Foto</th><th>Registrado por</th></tr>
+ ${D.m.map(x=>`<tr><td>${fmt(x.created_at)}</td><td><span class="bd ${x.tipo}">${x.tipo}</span></td><td>${esc(F(x.ferramenta_id)?.nome)}<div class="m">${esc(F(x.ferramenta_id)?.patrimonio)}</div></td>
+ <td>${esc(L(x.local_id)?.nome)}</td><td>${esc(x.pessoa)}</td><td><img class="ph" src="${x.foto_url}" onclick="foto('${x.foto_url}')"></td><td>${esc(x.usuario_nome)}</td></tr>`).join('')||'<tr><td colspan=7 class="m">Sem movimentações ainda.</td></tr>'}</table></div>`}
+function locais(){return`<div class="bar"><button class="btn" onclick="novoL()">+ Novo local</button></div><div class="tw"><table><tr><th>Local</th><th>Tipo</th><th>Armazém</th><th>Centro de custo</th><th></th></tr>
+ ${D.l.map(l=>`<tr><td><b>${esc(l.nome)}</b></td><td>${TP[l.tipo]}</td><td>${esc(l.armazem||'')}</td><td>${esc(l.centro_custo||'')}</td><td><button class="btn s o" onclick="act(editL,'${l.id}',D.l)">✏️ Editar</button></td></tr>`).join('')}</table></div>`}
+function edic(){return`<div class="tw"><table><tr><th>Quando</th><th>Quem editou</th><th>Onde</th><th>Campo</th><th>De → Para</th><th>Validação</th></tr>
+ ${D.e.map(x=>`<tr><td>${fmt(x.created_at)}</td><td>${esc(x.usuario_nome)}</td><td>${esc(x.tabela)}: ${esc(x.registro)}</td><td>${esc(x.campo)}</td><td>${esc(x.valor_antigo||'∅')} → <b>${esc(x.valor_novo||'∅')}</b></td><td class="m">${esc(x.nota)}</td></tr>`).join('')||'<tr><td colspan=6 class="m">Nenhuma edição registrada.</td></tr>'}</table></div>`}
+start();
+</script></body></html>
