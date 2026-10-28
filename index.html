@@ -60,7 +60,7 @@ function loginView(msg=''){ $('#app').innerHTML=`<div class="login"><h2>🛠️ 
 <p class="err">${msg}</p><button class="btn" style="width:100%" id="go">Entrar</button></div>`;
  const go=async()=>{const b=$('#go');b.disabled=true;const {error}=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});
   if(error){b.disabled=false;return loginView('E-mail ou senha inválidos.')}start()};
- $('#go').onclick=go;$('#pw').onkeydown=e=>e.key==='Enter'&&go();$('#em').onkeydown=e=>e.key==='Enter'&&$('#pw').focus();
+ $('#go').onclick=go;$('#pw').addEventListener('keydown',e=>{if(e.key==='Enter')go()});$('#em').addEventListener('keydown',e=>{if(e.key==='Enter')$('#pw').focus()});
  $('#ver').onclick=()=>{const p=$('#pw');p.type=p.type==='password'?'text':'password';p.focus()};$('#em').focus()}
 async function start(){
  const {data:{session}}=await sb.auth.getSession(); if(!session)return loginView();
@@ -87,7 +87,7 @@ function form(title,fields,okLabel,onSubmit){
  m.querySelector('#ok').onclick=async e=>{const b=e.target;const v={};
   fields.forEach(f=>{const el=m.querySelector(`[name=${f.k}]`);v[f.k]=f.t==='file'?el.files[0]:el.value.trim()});
   b.disabled=true;m.querySelector('.err').textContent='';
-  try{const r=await onSubmit(v);if(r){m.querySelector('.err').textContent=r;b.disabled=false}else c()}
+  try{const r=await onSubmit(v);if(r){m.querySelector('.err').textContent=r;b.disabled=false}else{c();await load();render()}}
   catch(x){m.querySelector('.err').textContent='Erro: '+(x.message||x);b.disabled=false}}}
 const pwField={k:'senha',l:'🔒 Sua senha de acesso (obrigatória para editar)',t:'password'};
 async function checkPw(s){if(!s)return false;const {error}=await sb.auth.signInWithPassword({email:me.email,password:s});return !error}
@@ -129,7 +129,7 @@ function editL(l){form(`Editar: ${esc(l.nome)}`,[...lFields(l),pwField],'Salvar 
  if(!await checkPw(v.senha))return'Senha incorreta.';const diffs=[],n={};
  ['nome','tipo','armazem','centro_custo'].forEach(k=>{if((l[k]??'')!==v[k]){diffs.push([k,l[k],v[k]]);n[k]=v[k]}});
  if(!diffs.length)return'Nada foi alterado.';const {error}=await sb.from('locais').update(n).eq('id',l.id);if(error)throw error;await logEdit('locais',l.nome,diffs);toast('Edição registrada ✔')})}
-function hist(f){const ms=D.m.filter(x=>x.ferramenta_id===f.id);const m=document.createElement('div');m.className='mask';m.onclick=e=>e.target===m&&m.remove();
+function hist(f){const ms=D.m.filter(x=>x.ferramenta_id===f.id);const m=document.createElement('div');m.className='mask';m.addEventListener('click',e=>{if(e.target===m)m.remove()});
  m.innerHTML=`<div class="modal"><h3>Histórico: ${esc(f.nome)}</h3>${ms.map(x=>`<div class="tl"><span class="bd ${x.tipo}">${x.tipo.toUpperCase()}</span> <b>${esc(L(x.local_id)?.nome)}</b>
  <div class="m">${fmt(x.created_at)} · ${esc(x.pessoa)} · registrado por ${esc(x.usuario_nome)}</div>${x.obs?`<div>${esc(x.obs)}</div>`:''}
  <img class="ph" src="${x.foto_url}" onclick="foto('${x.foto_url}')"></div>`).join('')||'<p class="m">Sem movimentações.</p>'}<button class="btn o" onclick="this.closest('.mask').remove()">Fechar</button></div>`;document.body.appendChild(m)}
