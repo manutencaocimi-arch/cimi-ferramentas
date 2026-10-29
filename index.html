@@ -144,7 +144,7 @@ function form(title,fields,okLabel,onSubmit){
    return`<select name="${f.k}">${h}</select>`}
   if(f.t==='file')return`<input type="file" name="${f.k}" accept="image/*" capture="environment">`;
   if(f.t==='area')return`<textarea name="${f.k}" rows="2">${esc(v)}</textarea>`;
-  return`<input name="${f.k}" type="${f.t||'text'}" value="${esc(v)}" autocomplete="off">`};
+  return`<input name="${f.k}" type="${f.t||'text'}" value="${esc(v)}" autocomplete="${f.t==='password'?'new-password':'off'}">`};
  m.innerHTML=`<div class="modal"><h3>${title}</h3>${fields.map(f=>`<label>${f.l}</label>${inp(f)}`).join('')}<div class="err"></div>
  <div class="acts" style="margin-top:14px"><button class="btn" id="ok">${okLabel}</button><button class="btn o" id="no">Cancelar</button></div></div>`;
  document.body.appendChild(m);const c=()=>m.remove();m.querySelector('#no').onclick=c;
@@ -183,11 +183,14 @@ const fFields=f=>[{k:'nome',l:'Nome',value:f?.nome},{k:'patrimonio',l:'Patrimôn
  {k:'marca',l:'Marca',value:f?.marca},{k:'modelo',l:'Modelo',value:f?.modelo},{k:'obs',l:'Observação',t:'area',value:f?.obs}];
 function novaF(){form('Nova ferramenta',fFields(),'Cadastrar',async v=>{if(!v.nome)return'Informe o nome.';
  const {error}=await sb.from('ferramentas').insert({...v,status:'disponivel',local_atual_id:cimi()?.id});if(error)throw error;toast('Cadastrada ✔')})}
-function editF(f){form(`Editar: ${esc(f.nome)}`,[...fFields(f),{k:'status',l:'Status',t:'select',value:f.status,opts:Object.entries(ST)},pwField],'Salvar edição',async v=>{
+function editF(f){form(`Editar: ${esc(f.nome)}`,[...fFields(f),{k:'status',l:'Status',t:'select',value:f.status,opts:Object.entries(ST)},{k:'motivo_baixa',l:'Motivo da baixa (obrigatório)',t:'area',value:f.motivo_baixa},pwField],'Salvar edição',async v=>{
  if(!await checkPw(v.senha))return'Senha incorreta.';const diffs=[];const n={};
- ['nome','patrimonio','serie','marca','modelo','obs','status'].forEach(k=>{if((f[k]??'')!==v[k]){diffs.push([k,f[k],v[k]]);n[k]=v[k]}});
+ if(v.status==='baixa'&&!v.motivo_baixa)return'Informe o motivo da baixa.';if(v.status!=='baixa')v.motivo_baixa='';
+ ['nome','patrimonio','serie','marca','modelo','obs','status','motivo_baixa'].forEach(k=>{if((f[k]??'')!==v[k]){diffs.push([k,f[k],v[k]]);n[k]=v[k]}});
  if(!diffs.length)return'Nada foi alterado.';const {error}=await sb.from('ferramentas').update(n).eq('id',f.id);if(error)throw error;
- await logEdit('ferramentas',f.nome+(f.patrimonio?' ('+f.patrimonio+')':''),diffs);toast('Edição registrada ✔')})}
+ await logEdit('ferramentas',f.nome+(f.patrimonio?' ('+f.patrimonio+')':''),diffs);toast('Edição registrada ✔')});
+ const m=document.body.lastElementChild,st=m.querySelector('[name=status]'),mo=m.querySelector('[name=motivo_baixa]'),lb=mo.previousElementSibling;
+ const tg=()=>{lb.style.display=mo.style.display=st.value==='baixa'?'':'none'};st.onchange=tg;tg()}
 const lFields=l=>[{k:'nome',l:'Nome do local',value:l?.nome},{k:'grupo',l:'Grupo',t:'select',value:l?.grupo,opts:(l?.tipo==='estoque'?[GR_CIMI]:GRUPOS).map(g=>[g,g])},
  {k:'armazem',l:'Armazém (sigla)',value:l?.armazem},{k:'centro_custo',l:'Centro de custo',value:l?.centro_custo}];
 function novoL(){form('Novo local',lFields(),'Cadastrar',async v=>{if(!v.nome)return'Informe o nome.';const {error}=await sb.from('locais').insert({...v,tipo:tipoDe(v.grupo)});if(error)throw error;toast('Local cadastrado ✔')})}
@@ -231,7 +234,7 @@ function painel(){const c=k=>D.f.filter(x=>x.status===k).length;
  <button class="btn" onclick="novaF()">+ Nova ferramenta</button></div>
  <div class="tw"><table><tr><th>Ferramenta</th><th>Patrimônio</th><th>Status</th><th>Local atual</th><th>Com quem</th><th>Ações</th></tr>
  ${list.map(f=>`<tr><td><b>${esc(f.nome)}</b><div class="m">${esc([f.marca,f.modelo].filter(Boolean).join(' · '))}</div></td><td>${esc(f.patrimonio||'—')}</td>
- <td><span class="bd ${f.status}">${ST[f.status]}</span></td><td>${esc(L(f.local_atual_id)?.nome||'—')}</td><td>${esc(f.responsavel_atual||'—')}</td>
+ <td><span class="bd ${f.status}">${ST[f.status]}</span>${f.status==='baixa'&&f.motivo_baixa?`<div class="m" style="margin-top:4px;max-width:220px">${esc(f.motivo_baixa)}</div>`:''}</td><td>${esc(L(f.local_atual_id)?.nome||'—')}</td><td>${esc(f.responsavel_atual||'—')}</td>
  <td class="acts">${f.status==='disponivel'?`<button class="btn s y" onclick="act(retirar,'${f.id}',D.f)">Retirar</button>`:''}${f.status==='em_uso'?`<button class="btn s" onclick="act(entregar,'${f.id}',D.f)">Entregar</button>`:''}
  <button class="btn s o" onclick="act(hist,'${f.id}',D.f)">Histórico</button><button class="btn s o" onclick="act(editF,'${f.id}',D.f)">✏️</button></td></tr>`).join('')||'<tr><td colspan=6 class="m">Nenhuma ferramenta encontrada.</td></tr>'}</table></div>`}
 function histView(){return`<div class="tw"><table><tr><th>Quando</th><th>Tipo</th><th>Ferramenta</th><th>Saiu de</th><th>Foi para</th><th>Dias no destino</th><th>Pessoa</th><th>Foto</th><th>Registrado por</th></tr>
