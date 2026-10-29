@@ -62,7 +62,7 @@ const SUPABASE_URL='https://qviqhcntabtuyisdhdqo.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2aXFoY250YWJ0dXlpc2RoZHFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMTA3NDUsImV4cCI6MjEwODc4Njc0NX0.d86r1LH9dKXg6q9geSD-xJ2IEDPSZAlzsSR8F2EJ7bk';
 // ==================================================================
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-let me=null,D={f:[],l:[],m:[],e:[],p:[],fn:[]},tab='painel',q='',flt='todos';
+let me=null,D={f:[],l:[],m:[],e:[],p:[],fn:[],rc:[]},tab='painel',q='',flt='todos';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=d=>new Date(d).toLocaleString('pt-BR');
@@ -104,31 +104,42 @@ function dataMov(id){const m=D.m.find(x=>x.id===id),d=new Date(m.created_at),loc
 // ---------- Recolhimento de material (Logística) ----------
 let RC=null,RCerr='',RCbusy=false;
 const rcPend=()=>(RC||[]).filter(x=>x.status==='pendente');
+const rcRec=()=>(RC||[]).filter(x=>x.status==='recolhido');
 async function carregaRC(){if(RCbusy)return;RCbusy=true;
  try{const {data,error}=await sb.rpc('logistica_pendentes');if(error)throw error;RC=data||[];RCerr=''}catch(e){RC=[];RCerr=e.message||String(e)}
  RCbusy=false;if(me&&me.papel==='logistica')logView();else render()}
 function recolHtml(){
  if(RC===null){carregaRC();return'<p class="m">Carregando pedidos…</p>'}
- const p=rcPend(),ok=RC.filter(x=>x.status==='recolhido');
- const card=x=>{const pe=x.status==='pendente';return`<div class="card" style="margin-bottom:12px;border-left:6px solid ${pe?'var(--o)':'var(--g)'}">
-  <div style="font-size:12px;font-weight:700;color:${pe?'var(--o)':'var(--gd)'}">${pe?'🔔 RECOLHER MATERIAL':'✔ RECOLHIDO'}</div>
+ const cm=me.papel!=='logistica',pode=['logistica','principal'].includes(me.papel),p=rcPend(),tr=rcRec(),ok=RC.filter(x=>x.status==='concluido');
+ const bt=(u,l)=>u?`<div style="margin-top:8px"><div class="m">${l}</div><img src="${esc(u)}" style="max-width:200px;max-height:200px;border-radius:8px;cursor:pointer;border:1px solid var(--b)" onclick="foto('${esc(u)}')"></div>`:'';
+ const card=x=>{const pe=x.status==='pendente',tra=x.status==='recolhido',cor=pe?'var(--o)':tra?'var(--bl)':'var(--g)',
+  tit=pe?'🔔 RECOLHER MATERIAL':tra?(cm?'🚚 RECOLHIDO PELA LOGÍSTICA · AGUARDANDO RECEBIMENTO NO CIMI':'🚚 RECOLHIDO · LEVAR AO CIMI (o CIMI confirma o recebimento)'):'✔ RECEBIDO NO CIMI';
+  return`<div class="card" style="margin-bottom:12px;border-left:6px solid ${cor}">
+  <div style="font-size:12px;font-weight:700;color:${cor}">${tit}</div>
   <div style="font-size:20px;font-weight:800;margin:4px 0">${esc(x.ferramenta)} <span class="m">${esc(x.patrimonio||'')}</span></div>
   <div>📍 ${esc(x.local||'—')}${x.grupo?` <span class="m">(${esc(x.grupo)})</span>`:''}</div>
   ${x.com?`<div>👷 Com: ${esc(x.com)}</div>`:''}
   <div class="m">Pedido de <strong>${esc(x.solicitante||'—')}</strong> · ${fmt(x.quando)}</div>
   ${x.obs?`<div style="margin-top:6px">💬 ${esc(x.obs)}</div>`:''}
-  ${pe?`<button class="btn" style="width:100%;margin-top:12px;padding:14px;font-size:16px" onclick="recolher('${x.id}')">📷 Recolhi — enviar foto</button>`
-   :`<div class="m" style="margin-top:6px">Por ${esc(x.recolhido_por||'—')} · ${x.recolhido_em?fmt(x.recolhido_em):''} · voltou ao CIMI</div>${x.foto?`<img src="${esc(x.foto)}" style="max-width:160px;border-radius:8px;margin-top:8px;cursor:pointer" onclick="foto('${esc(x.foto)}')">`:''}`}</div>`};
+  ${bt(x.foto_pedido,'📷 Foto enviada por quem pediu (onde está / o que recolher)')}
+  ${!pe?`<div class="m" style="margin-top:8px">🚚 Recolhido por ${esc(x.recolhido_por||'—')} · ${x.recolhido_em?fmt(x.recolhido_em):''}</div>${bt(x.foto,'📷 Foto do recolhimento')}`:''}
+  ${x.status==='concluido'?`<div class="m" style="margin-top:8px">📥 Recebido no CIMI por ${esc(x.recebido_por||'—')} · ${x.recebido_em?fmt(x.recebido_em):''}</div>${x.recebido_obs?`<div>💬 ${esc(x.recebido_obs)}</div>`:''}${bt(x.recebido_foto,'📷 Foto do recebimento no CIMI')}`:''}
+  ${pe&&pode?`<button class="btn" style="width:100%;margin-top:12px;padding:14px;font-size:16px" onclick="recolher('${x.id}')">📷 Recolhi — enviar foto</button>`:''}
+  ${pe&&!pode?'<div class="m" style="margin-top:8px">⏳ Aguardando a Logística recolher.</div>':''}
+  ${tra&&cm?`<button class="btn" style="width:100%;margin-top:12px;padding:14px;font-size:16px" onclick="cimiReceber('${x.id}')">📥 Recebi no CIMI — enviar foto e dar baixa</button>`:''}
+  ${tra&&!cm?'<div class="m" style="margin-top:8px">⏳ Entregue o material no CIMI. A baixa só é dada quando o CIMI confirmar o recebimento.</div>':''}</div>`};
+ const partes=[];if(p.length)partes.push(`🔔 ${p.length} pedido${p.length>1?'s':''} de recolhimento`);if(tr.length)partes.push(cm?`📥 ${tr.length} para o CIMI receber`:`🚚 ${tr.length} aguardando recebimento do CIMI`);
+ const alerta=p.length>0||(cm&&tr.length>0);
  return`${RCerr?`<p class="err">Não foi possível carregar os pedidos: ${esc(RCerr)}</p>`:''}
- <div class="card" style="margin-bottom:14px;background:${p.length?'#fff4e5':'#e9f7ee'};border-color:${p.length?'var(--o)':'var(--g)'};display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-  <strong style="font-size:18px;flex:1">${p.length?`🔔 ${p.length} pedido${p.length>1?'s':''} de recolhimento`:'✔ Nenhum pedido pendente'}</strong><button class="btn o" onclick="carregaRC()">↻ Atualizar</button></div>
- ${p.map(card).join('')}${ok.length?`<h3 style="margin:18px 0 8px">Recolhidos (últimos 30 dias)</h3>${ok.map(card).join('')}`:''}`}
+ <div class="card" style="margin-bottom:14px;background:${alerta?'#fff4e5':'#e9f7ee'};border-color:${alerta?'var(--o)':'var(--g)'};display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+  <strong style="font-size:18px;flex:1">${partes.length?partes.join(' · '):'✔ Nenhum pedido pendente'}</strong><button class="btn o" onclick="carregaRC()">↻ Atualizar</button></div>
+ ${p.map(card).join('')}${tr.length?`<h3 style="margin:18px 0 8px">A caminho do CIMI — aguardando recebimento</h3>${tr.map(card).join('')}`:''}${ok.length?`<h3 style="margin:18px 0 8px">Recebidos no CIMI (últimos 30 dias)</h3>${ok.map(card).join('')}`:''}`}
 function logView(){const n=rcPend().length;document.title=(n?`(${n}) `:'')+'CIMI · Logística';
  $('#app').innerHTML=`<header><h1>🚚 CIMI · Logística</h1><small>${esc(me.nome)}</small><button class="btn o s" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></header><main style="max-width:720px;padding:14px">${recolHtml()}</main>`}
 function iniciaLogistica(){logView();setInterval(()=>{if(!document.hidden&&!document.querySelector('.mask'))carregaRC()},20000);
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)carregaRC()})}
 function recolher(id){const x=RC.find(r=>r.id===id);if(!x)return;const m=document.createElement('div');m.className='mask';
- m.innerHTML=`<div class="modal"><h3>📷 Confirmar recolhimento</h3><div><strong>${esc(x.ferramenta)}</strong> <span class="m">${esc(x.patrimonio||'')}</span><div class="m">${esc(x.local||'')} → volta para o CIMI</div></div>
+ m.innerHTML=`<div class="modal"><h3>📷 Confirmar recolhimento</h3><div><strong>${esc(x.ferramenta)}</strong> <span class="m">${esc(x.patrimonio||'')}</span><div class="m">${esc(x.local||'')} → levar ao CIMI (o CIMI confirma o recebimento e dá a baixa)</div>${x.foto_pedido?`<div class="m" style="margin-top:8px">📷 Foto enviada por quem pediu:</div><img src="${esc(x.foto_pedido)}" style="max-width:100%;max-height:200px;border-radius:8px" onclick="foto('${esc(x.foto_pedido)}')">`:''}</div>
  <label>Foto que comprova o recolhimento (obrigatória)</label><input type="file" id="rf" accept="image/*" capture="environment"><div id="rp" style="margin:8px 0"></div><div class="err" id="re"></div>
  <div class="acts" style="margin-top:14px"><button class="btn" id="rok" style="flex:1;padding:12px">✔ Confirmar recolhimento</button><button class="btn o" id="rno">Cancelar</button></div></div>`;
  document.body.appendChild(m);const c=()=>m.remove();m.querySelector('#rno').onclick=c;
@@ -140,8 +151,27 @@ function recolher(id){const x=RC.find(r=>r.id===id);if(!x)return;const m=documen
    const {error:ue}=await sb.storage.from('fotos').upload(pa,bl,{contentType:'image/jpeg'});if(ue)throw ue;
    const url=sb.storage.from('fotos').getPublicUrl(pa).data.publicUrl;
    const {data,error}=await sb.rpc('logistica_recolher',{p_id:id,p_foto:url});if(error)throw error;
-   if(data==='ok'||data==='ja_recolhido'){c();toast(data==='ok'?'Recolhimento registrado ✔ — a ferramenta voltou ao CIMI':'Este pedido já havia sido recolhido');carregaRC()}
+   if(data==='ok'||data==='ja_recolhido'){c();toast(data==='ok'?'Recolhimento registrado ✔ — leve ao CIMI; a baixa é dada pelo CIMI':'Este pedido já havia sido recolhido');carregaRC()}
    else{b.disabled=false;er.textContent=data==='foto_obrigatoria'?'A foto é obrigatória.':'Sem permissão para recolher.'}}
+  catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}}
+function cimiReceber(id){const rr=(D.rc||[]).find(r=>r.id===id),xr=(RC||[]).find(r=>r.id===id);if(!rr&&!xr)return;
+ const nome=rr?F(rr.ferramenta_id)?.nome:xr.ferramenta,pat=rr?F(rr.ferramenta_id)?.patrimonio:xr.patrimonio,loc=rr?L(rr.local_id)?.nome:xr.local,por=rr?.recolhido_por_nome||xr?.recolhido_por,em=rr?.recolhido_em||xr?.recolhido_em;
+ const m=document.createElement('div');m.className='mask';
+ m.innerHTML=`<div class="modal"><h3>📥 Receber no CIMI e dar baixa</h3><div><strong>${esc(nome||'')}</strong> <span class="m">${esc(pat||'')}</span><div class="m">Recolhido em ${esc(loc||'—')} por ${esc(por||'—')}${em?' · '+fmt(em):''}</div></div>
+ <label>Foto da ferramenta recebida no CIMI (obrigatória)</label><input type="file" id="cf2" accept="image/*" capture="environment"><div id="cp2" style="margin:8px 0"></div>
+ <label>Observação (estado da ferramenta — opcional)</label><textarea id="co2" rows="2"></textarea><div class="err" id="ce2"></div>
+ <div class="acts" style="margin-top:14px"><button class="btn" id="cok2" style="flex:1;padding:12px">✔ Confirmar recebimento e dar baixa</button><button class="btn o" id="cno2">Cancelar</button></div></div>`;
+ document.body.appendChild(m);const c=()=>m.remove();m.querySelector('#cno2').onclick=c;
+ m.querySelector('#cf2').onchange=e=>{const f=e.target.files[0];m.querySelector('#cp2').innerHTML=f?`<img src="${URL.createObjectURL(f)}" style="max-width:100%;max-height:240px;border-radius:10px">`:''};
+ m.querySelector('#cok2').onclick=async e=>{const b=e.target,er=m.querySelector('#ce2'),fl=m.querySelector('#cf2').files[0],ob=m.querySelector('#co2').value.trim();er.textContent='';
+  if(!fl)return er.textContent='Tire a foto da ferramenta recebida para dar a baixa.';
+  b.disabled=true;er.textContent='Enviando…';
+  try{const bl=await shrink(fl),pa=`recolhimentos/${id}/cimi-${Date.now()}.jpg`;
+   const {error:ue}=await sb.storage.from('fotos').upload(pa,bl,{contentType:'image/jpeg'});if(ue)throw ue;
+   const url=sb.storage.from('fotos').getPublicUrl(pa).data.publicUrl;
+   const {data,error}=await sb.rpc('cimi_receber',{p_id:id,p_foto:url,p_obs:ob});if(error)throw error;
+   if(data==='ok'||data==='ja_recebido'){c();toast(data==='ok'?'Recebimento registrado ✔ — baixa dada, a ferramenta voltou ao CIMI':'Este recolhimento já havia sido recebido');await load();await carregaRC()}
+   else{b.disabled=false;er.textContent=data==='foto_obrigatoria'?'A foto é obrigatória.':data==='nao_recolhido'?'A Logística ainda não confirmou o recolhimento.':'Sem permissão para dar baixa.'}}
   catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}}
 function perfilAC(id){const u=AC.find(x=>x.id===id);
  form(`Perfil de acesso: ${esc(u.nome)}`,[{k:'papel',l:'Perfil',t:'select',value:u.papel==='logistica'?'logistica':'correlato',opts:[['correlato','Correlato — usa o sistema completo'],['logistica','🚚 Logística — vê somente os pedidos de recolhimento']]},pwField],'Salvar perfil',async v=>{
@@ -242,12 +272,12 @@ async function start(){
  me={id:session.user.id,email:session.user.email,nome:p?.nome||session.user.email,papel:p?.papel||'correlato'};me.trocar=p?.trocar_senha===true&&me.papel!=='principal';
  if(me.trocar)return trocarView();
  if(me.papel==='logistica')return iniciaLogistica();
- await load(); render();if(me.papel==='principal')carregaRC();
- sb.channel('rt').on('postgres_changes',{event:'*',schema:'public'},async()=>{await load();render();if(me.papel==='principal')carregaRC()}).subscribe()}
+ await load(); render();carregaRC();
+ sb.channel('rt').on('postgres_changes',{event:'*',schema:'public'},async()=>{await load();render();carregaRC()}).subscribe()}
 async function load(){
- const [f,l,m,e,pe,fu]=await Promise.all([sb.from('ferramentas').select('*').order('nome'),sb.from('locais').select('*').order('nome'),
-  sb.from('movimentacoes').select('*').order('created_at',{ascending:false}).limit(500),sb.from('edicoes').select('*').order('created_at',{ascending:false}).limit(300),sb.from('pessoas').select('*').order('nome'),sb.from('funcoes').select('*').order('nome')]);
- D={f:f.data||[],l:l.data||[],m:m.data||[],e:e.data||[],p:pe.data||[],fn:fu.data||[]}}
+ const [f,l,m,e,pe,fu,rc]=await Promise.all([sb.from('ferramentas').select('*').order('nome'),sb.from('locais').select('*').order('nome'),
+  sb.from('movimentacoes').select('*').order('created_at',{ascending:false}).limit(500),sb.from('edicoes').select('*').order('created_at',{ascending:false}).limit(300),sb.from('pessoas').select('*').order('nome'),sb.from('funcoes').select('*').order('nome'),sb.from('recolhimentos').select('*').order('created_at',{ascending:false}).limit(500)]);
+ D={f:f.data||[],l:l.data||[],m:m.data||[],e:e.data||[],p:pe.data||[],fn:fu.data||[],rc:rc.data||[]}}
 
 // ---------- Modal / formulário genérico ----------
 function form(title,fields,okLabel,onSubmit){
@@ -326,7 +356,8 @@ function entregar(f){form(`Devolver ao CIMI: ${esc(f.nome)}`,[...pessoaFields(D.
  {k:'foto',l:'📷 Foto de quem entregou (obrigatória)',t:'file'},{k:'obs',l:'Observação (estado da ferramenta)',t:'area'}],'Confirmar entrega',async v=>{
   const {p,nome}=quem(v);if(!nome||!v.foto)return'Escolha a pessoa e tire a foto.';const url=await upload(v.foto,f.id);
   let r=await sb.from('movimentacoes').insert({ferramenta_id:f.id,tipo:'entrega',local_id:f.local_atual_id,pessoa:nome,pessoa_id:p?.id||null,foto_url:url,obs:v.obs,usuario_id:me.id,usuario_nome:me.nome});if(r.error)throw r.error;
-  r=await sb.from('ferramentas').update({status:'disponivel',local_atual_id:cimi()?.id,responsavel_atual:null}).eq('id',f.id);if(r.error)throw r.error;toast('Entrega registrada ✔')})}
+  r=await sb.from('ferramentas').update({status:'disponivel',local_atual_id:cimi()?.id,responsavel_atual:null}).eq('id',f.id);if(r.error)throw r.error;
+  await sb.from('recolhimentos').update({status:'cancelado'}).eq('ferramenta_id',f.id).eq('status','pendente');toast('Entrega registrada ✔')})}
 const fFields=f=>[{k:'nome',l:'Nome',value:f?.nome},{k:'patrimonio',l:'Patrimônio',value:f?.patrimonio},{k:'serie',l:'Nº de série',value:f?.serie},
  {k:'marca',l:'Marca',value:f?.marca},{k:'modelo',l:'Modelo',value:f?.modelo},
  {k:'uso',l:'Tipo de uso',t:'select',value:f?.uso||'',opts:[['','— Sem classificação —'],...USOS.map(u=>[u[0],u[1]+' '+u[0]])]},{k:'obs',l:'Observação',t:'area',value:f?.obs}];
@@ -378,10 +409,11 @@ const act=(fn,id,arr)=>fn(arr.find(x=>x.id===id));
 
 // ---------- Telas ----------
 function render(){
- const tabs=[['painel','🧰 Ferramentas'],['hist','🕘 Movimentações'],['locais','📍 Locais'],['pessoas','👷 Pessoas'],['funcoes','🏷️ Funções'],['edic','✏️ Edições']];if(me.papel==='principal')tabs.push(['recol','🚚 Recolhimentos'+(rcPend().length?' <span class="pill u">'+rcPend().length+'</span>':'')],['acessos','🔑 Acessos']);
+ const tabs=[['painel','🧰 Ferramentas'],['hist','🕘 Movimentações'],['locais','📍 Locais'],['pessoas','👷 Pessoas'],['funcoes','🏷️ Funções'],['edic','✏️ Edições']];{const nr=rcPend().length+rcRec().length;tabs.push(['recol','🚚 Recolhimentos'+(nr?' <span class="pill u">'+nr+'</span>':'')])}if(me.papel==='principal')tabs.push(['acessos','🔑 Acessos']);
  $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas</h1><small>${esc(me.nome)} (${me.papel==='principal'?'principal':'correlato'})</small><button class="btn o s" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></header>
  <nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';q='';render()">${t[1]}</button>`).join('')}</nav><main>${{painel,hist:histView,locais,pessoas,funcoes,edic,acessos,recol:recolHtml}[tab]()}</main>`;
  const s=$('#q');if(s){s.oninput=e=>{q=e.target.value;const p=e.target.selectionStart;render();const n=$('#q');n.focus();n.setSelectionRange(p,p)}}}
+const recAtiva=fid=>(D.rc||[]).find(r=>r.ferramenta_id===fid&&(r.status==='pendente'||r.status==='recolhido'));
 function painel(){const c=k=>D.f.filter(x=>x.status===k).length;
  const nU=u=>D.f.filter(x=>u==='sem'?!x.uso:x.uso===u).length;
  const uCard=(id,ic,nome,cor,n)=>`<button class="gc ${usoSel===id?'on':''}" style="--c:${cor}" onclick="usoSel='${id}';render()"><span class="ic">${ic}</span><b>${nome}</b><span class="n">${n}</span> <span style="font-size:13px">ferramentas</span><div class="bar2"><i style="width:${D.f.length?Math.round(n/D.f.length*100):0}%"></i></div></button>`;
@@ -393,16 +425,49 @@ function painel(){const c=k=>D.f.filter(x=>x.status===k).length;
  <button class="btn" onclick="novaF()">+ Nova ferramenta</button></div>
  <div class="tw"><table><tr><th>Ferramenta</th><th>Patrimônio</th><th>Status</th><th>Local atual</th><th>Com quem</th><th>Ações</th></tr>
  ${list.map(f=>`<tr><td><b>${esc(f.nome)}</b><div class="m">${esc([f.marca,f.modelo].filter(Boolean).join(' · '))}</div>${f.uso?`<span class="pill">${esc((USOS.find(u=>u[0]===f.uso)||[,''])[1])} ${esc(f.uso)}</span>`:''}</td><td>${esc(f.patrimonio||'—')}</td>
- <td><span class="bd ${f.status}">${ST[f.status]}</span>${f.status==='baixa'&&f.motivo_baixa?`<div class="m" style="margin-top:4px;max-width:220px">${esc(f.motivo_baixa)}</div>`:''}</td><td>${esc(L(f.local_atual_id)?.nome||'—')}</td><td>${esc(f.responsavel_atual||'—')}${f.status==='em_uso'&&pend(D.m.find(x=>x.ferramenta_id===f.id)||{})?'<div><span class="bd em_uso">⏳ Aguardando confirmação</span></div>':''}</td>
- <td class="acts">${f.status==='disponivel'?`<button class="btn s y" onclick="act(retirar,'${f.id}',D.f)">Retirar</button>`:''}${f.status==='em_uso'?`<button class="btn s" onclick="act(entregar,'${f.id}',D.f)">Entregar</button>`:''}
+ <td><span class="bd ${f.status}">${ST[f.status]}</span>${f.status==='baixa'&&f.motivo_baixa?`<div class="m" style="margin-top:4px;max-width:220px">${esc(f.motivo_baixa)}</div>`:''}</td><td>${esc(L(f.local_atual_id)?.nome||'—')}</td><td>${esc(f.responsavel_atual||'—')}${f.status==='em_uso'&&pend(D.m.find(x=>x.ferramenta_id===f.id)||{})?'<div><span class="bd em_uso">⏳ Aguardando confirmação</span></div>':''}${recAtiva(f.id)?`<div><span class="bd em_uso" style="white-space:normal;display:inline-block;margin-top:4px">${recAtiva(f.id).status==='recolhido'?'🚚 A caminho do CIMI':'🔔 Recolhimento solicitado'}</span></div>`:''}</td>
+ <td class="acts">${f.status==='disponivel'?`<button class="btn s y" onclick="act(retirar,'${f.id}',D.f)">Retirar</button>`:''}${f.status==='em_uso'?(recAtiva(f.id)?.status==='recolhido'?`<button class="btn s" onclick="cimiReceber('${recAtiva(f.id).id}')">📥 Receber</button>`:`<button class="btn s" onclick="act(entregar,'${f.id}',D.f)">Entregar</button>`):''}
  <button class="btn s o" onclick="act(hist,'${f.id}',D.f)">Histórico</button><button class="btn s o" onclick="act(editF,'${f.id}',D.f)">✏️</button></td></tr>`).join('')||'<tr><td colspan=6 class="m">Nenhuma ferramenta encontrada.</td></tr>'}</table></div>`}
+const recsDe=x=>x.tipo==='retirada'?(D.rc||[]).filter(r=>String(r.mov_id)===String(x.id)&&r.status!=='cancelado'):x.recolhimento_id?(D.rc||[]).filter(r=>r.id===x.recolhimento_id):[];
+const recBadge=x=>{const r=recsDe(x).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0];if(!r)return'';
+ const t=r.status==='pendente'?['em_uso','🔔 Recolhimento solicitado — aguardando a Logística']:r.status==='recolhido'?['em_uso','🚚 Recolhido pela Logística — aguardando o CIMI receber']:['disponivel','✔ Recolhimento concluído no CIMI'];
+ return`<div style="margin-top:6px"><span class="bd ${t[0]}" style="white-space:normal;display:inline-block">${t[1]}</span></div>`};
+function movDet(id){const x=D.m.find(y=>String(y.id)===String(id));if(!x)return;const fer=F(x.ferramenta_id)||{};
+ const ms=D.m.filter(y=>y.ferramenta_id===x.ferramenta_id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+ const ini=x.tipo==='retirada'?x:([...ms].reverse().find(y=>y.tipo==='retirada'&&new Date(y.created_at)<new Date(x.created_at))||null);
+ const fim=x.tipo==='entrega'?x:(ms.find(y=>y.tipo==='entrega'&&new Date(y.created_at)>new Date(x.created_at))||null);
+ const ev=[],ph=(u,l)=>u?{u,l}:null,E=(ic,t,q,linhas,fotos,cor)=>ev.push({ic,t,q,linhas:linhas.filter(Boolean),fotos:fotos.filter(Boolean),cor:cor||'var(--b)'});
+ const ob=o=>o?`💬 ${esc(o)}`:'';
+ let rs=[];
+ if(ini){const [a,b]=rota(ini);
+  E(ini.via_logistica?'🚚':'📤',ini.via_logistica?'Saída do CIMI — entrega pela Logística':'Saída do CIMI — retirada',ini.created_at,
+   [`${esc(L(a)?.nome||'—')} → <b>${esc(L(b)?.nome||'—')}</b>`,`Pessoa: <b>${esc(ini.pessoa)}</b>`,ini.via_logistica?`Levado por: <b>${esc(ini.logistica_nome||'Logística')}</b>`:'',`Registrado por: ${esc(ini.usuario_nome)}`,ob(ini.obs)],
+   [ph(ini.foto_url,ini.via_logistica?'Foto da entrega':'Foto da retirada')],'var(--o)');
+  if(ini.via_logistica){const cs=ini.conf_status;
+   if(cs==='confirmada'||cs==='contestada')E(cs==='confirmada'?'✔':'⚠',cs==='confirmada'?'Recebimento confirmado no local':'Divergência informada no recebimento',ini.conf_em,[`Por: <b>${esc(ini.conf_nome||'—')}</b>`,ob(ini.conf_obs)],[ph(ini.conf_foto_url,'Foto do recebimento')],cs==='confirmada'?'var(--g)':'var(--r)');
+   else E('⏳','Aguardando confirmação do recebimento no local',null,[],[],'var(--o)')}
+  rs=(D.rc||[]).filter(r=>String(r.mov_id)===String(ini.id)&&r.status!=='cancelado').sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+  rs.forEach(r=>{
+   E('🔔','Pedido de recolhimento',r.created_at,[`Solicitado por: <b>${esc(r.solicitante||'—')}</b>${r.origem==='link'?' (pelo link)':''}`,ob(r.obs)],[ph(r.foto_pedido_url,'Foto do local / material a recolher')],'var(--o)');
+   if(r.status==='pendente')E('⏳','Aguardando a Logística recolher',null,[],[],'var(--o)');
+   if(r.status!=='pendente')E('🚚','Recolhido pela Logística',r.recolhido_em,[`Por: <b>${esc(r.recolhido_por_nome||'—')}</b> → levado ao CIMI`],[ph(r.foto_url,'Foto do recolhimento')],'var(--bl)');
+   if(r.status==='recolhido')E('⏳','Aguardando recebimento no CIMI',null,[],[],'var(--bl)');
+   if(r.status==='concluido')E('📥','Recebido no CIMI — baixa dada',r.recebido_em,[`Por: <b>${esc(r.recebido_por_nome||'—')}</b>`,ob(r.recebido_obs)],[ph(r.recebido_foto_url,'Foto do recebimento no CIMI')],'var(--g)')})}
+ const fimRec=fim&&fim.recolhimento_id&&rs.some(r=>r.id===fim.recolhimento_id);
+ if(fim&&!fimRec)E('↩','Devolução ao CIMI',fim.created_at,[`Entregue por: <b>${esc(fim.pessoa)}</b>`,`Registrado por: ${esc(fim.usuario_nome)}`,ob(fim.obs)],[ph(fim.foto_url,'Foto da devolução')],'var(--g)');
+ if(!fim&&fer.status==='em_uso')E('🧰','Ainda em uso',null,[`Com: <b>${esc(fer.responsavel_atual||'—')}</b> · ${esc(L(fer.local_atual_id)?.nome||'—')}`],[],'var(--o)');
+ const m=document.createElement('div');m.className='mask';m.addEventListener('click',e=>{if(e.target===m)m.remove()});
+ m.innerHTML=`<div class="modal" style="max-width:640px"><h3>🔎 Percurso: ${esc(fer.nome||'')} <span class="m">${esc(fer.patrimonio||'')}</span></h3>
+ <div class="m" style="margin-bottom:8px">Todo o caminho da ferramenta neste ciclo: quem passou, quando e todas as fotos.${ini?` · Dias no destino: ${dias(ini)}`:''}</div>
+ ${ev.map(e=>`<div class="tl" style="border-left-color:${e.cor}"><div><span style="font-size:18px">${e.ic}</span> <b>${e.t}</b></div>${e.q?`<div class="m">${fmt(e.q)}</div>`:''}${e.linhas.map(l=>`<div>${l}</div>`).join('')}${e.fotos.length?`<div class="acts" style="margin-top:6px">${e.fotos.map(f=>`<div style="text-align:center"><img class="ph" style="width:96px;height:96px" src="${esc(f.u)}" onclick="foto('${esc(f.u)}')"><div class="m" style="max-width:96px">${esc(f.l)}</div></div>`).join('')}</div>`:''}</div>`).join('')||'<p class="m">Sem dados.</p>'}
+ <button class="btn o" onclick="this.closest('.mask').remove()">Fechar</button></div>`;document.body.appendChild(m)}
 function histView(){const lista=mvFiltrado(D.m);
  return`<div class="card" style="margin-bottom:12px"><div class="bar" style="align-items:flex-end;margin:0"><div><label>De</label><input type="date" value="${MV.de}" onchange="MV.de=this.value;render()" style="width:auto"></div><div><label>Até</label><input type="date" value="${MV.ate}" onchange="MV.ate=this.value;render()" style="width:auto"></div>
  <div style="flex:1;min-width:220px"><label>Local</label><select style="width:100%" onchange="MV.loc=this.value;render()">${localOpts(MV.loc,true)}</select></div>
  <button class="btn o" onclick="MV.de=MV.ate='';MV.loc='todos';render()">Limpar</button><button class="btn y" onclick="relMov('print')">🖨️ Imprimir</button><button class="btn" onclick="relMov('pdf')">📄 Baixar PDF</button><button class="btn o" onclick="relMov('xlsx')">📊 Baixar Excel</button></div>
- <div class="m" style="margin-top:8px">${lista.length} movimentação(ões) no filtro atual.${lista.filter(pend).length?` · <b style="color:var(--o)">⏳ ${lista.filter(pend).length} entrega(s) da Logística aguardando confirmação</b>`:''} O relatório baixado usa os mesmos filtros (data e local).</div></div><div class="tw"><table><tr><th>Data da Retirada / Retorno</th><th>Tipo</th><th>Ferramenta</th><th>Saiu de</th><th>Foi para</th><th>Dias no destino</th><th>Pessoa</th><th>Entrega / Confirmação</th><th>Foto</th><th>Registrado por</th></tr>
+ <div class="m" style="margin-top:8px">${lista.length} movimentação(ões) no filtro atual.${lista.filter(pend).length?` · <b style="color:var(--o)">⏳ ${lista.filter(pend).length} entrega(s) da Logística aguardando confirmação</b>`:''} O relatório baixado usa os mesmos filtros (data e local).</div></div><div class="tw"><table><tr><th>Data da Retirada / Retorno</th><th>Tipo</th><th>Ferramenta</th><th>Saiu de</th><th>Foi para</th><th>Dias no destino</th><th>Pessoa</th><th>Entrega / Confirmação</th><th>Foto</th><th>Registrado por</th><th>Percurso</th></tr>
  ${lista.map(x=>`<tr><td><div class="m" style="font-weight:700;margin-bottom:2px">${x.tipo==='retirada'?'Data da Retirada':'Data de Retorno'}</div>${fmt(x.created_at)}<div><button class="btn s o" title="Alterar data (pede senha)" onclick="dataMov('${x.id}')">📅 Data</button></div></td><td><span class="bd ${x.tipo}">${x.tipo}</span></td><td>${esc(F(x.ferramenta_id)?.nome)}<div class="m">${esc(F(x.ferramenta_id)?.patrimonio)}</div></td>
- ${rotaTd(x)}<td>${dias(x)}</td><td>${esc(x.pessoa)}</td><td>${confBadge(x)}</td><td><img class="ph" src="${x.foto_url}" onclick="foto('${x.foto_url}')"></td><td>${esc(x.usuario_nome)}</td></tr>`).join('')||'<tr><td colspan=10 class="m">Nenhuma movimentação encontrada.</td></tr>'}</table></div>`}
+ ${rotaTd(x)}<td>${dias(x)}</td><td>${esc(x.pessoa)}</td><td>${confBadge(x)}${recBadge(x)}</td><td><img class="ph" src="${x.foto_url}" onclick="foto('${x.foto_url}')"></td><td>${esc(x.usuario_nome)}</td><td><button class="btn s" onclick="movDet('${x.id}')">🔎 Detalhes</button></td></tr>`).join('')||'<tr><td colspan=11 class="m">Nenhuma movimentação encontrada.</td></tr>'}</table></div>`}
 const GV={[GR_CIMI]:['🏠','#2e9e4f'],'Estações BRT Norte Sul':['🚏','#2b6cb0'],'Estações BRT Leste Oeste':['🚏','#7b4fc4'],'Terminais Estações BRT Leste - Oeste':['🚌','#0f8f8f'],'Terminais Estações BRT Norte - Sul':['🚌','#c2410c'],'Terminais Primitivos':['🏛️','#8a6d3b'],"PA'S":['🏢','#d6457a'],'Sem grupo':['📍','#6b7a71']};
 const usoEm=id=>D.f.filter(f=>f.status==='em_uso'&&f.local_atual_id===id);
 function verL(id){const l=L(id),us=usoEm(id),ms=D.m.filter(x=>x.local_id===id).slice(0,8);const m=document.createElement('div');m.className='mask';m.addEventListener('click',e=>{if(e.target===m)m.remove()});
@@ -447,12 +512,17 @@ async function confirmView(tk){let recX='',recBind=()=>{};const box=h=>{$('#app'
  if(error||!i)return box('<p class="err">Link inválido ou expirado. Peça um novo link à Logística ou ao CIMI.</p>');
  const det=`<div class="card" style="margin:10px 0"><div><b>🧰 ${esc(i.ferramenta)}</b> <span class="m">${esc(i.patrimonio||'')}</span></div><div>📍 ${esc(i.local||'')}</div><div>🚚 Entregue por: <b>${esc(i.logistica||'Logística')}</b></div><div class="m">${fmt(i.quando)} · destinatário: ${esc(i.pessoa)}</div></div>`;
  recX=i.recolh==='pendente'?`<div class="card" style="margin:14px 0 0;border-left:4px solid var(--o)">🚚 <strong>Recolhimento solicitado.</strong> A Logística foi avisada e virá buscar a ferramenta no local.</div>`
-  :i.recolh==='recolhido'?`<div class="card" style="margin:14px 0 0;border-left:4px solid var(--g)">✔ <strong>Ferramenta recolhida</strong> pela Logística${i.recolh_em?' em '+fmt(i.recolh_em):''}. Ela já voltou ao CIMI.</div>`
+  :i.recolh==='recolhido'?`<div class="card" style="margin:14px 0 0;border-left:4px solid var(--bl)">🚚 <strong>Ferramenta recolhida</strong> pela Logística${i.recolh_em?' em '+fmt(i.recolh_em):''}. Ela está a caminho do CIMI.</div>`
+  :i.recolh==='concluido'?`<div class="card" style="margin:14px 0 0;border-left:4px solid var(--g)">✔ <strong>Recolhimento concluído.</strong> A ferramenta foi recebida no CIMI${i.recebido_em?' em '+fmt(i.recebido_em):''}.</div>`
   :i.pode_recolher?`<button class="btn o" style="width:100%;margin-top:14px;padding:12px" id="crec">📦 Recolher material</button><div id="crecf"></div>`:'';
  recBind=()=>{const b=$('#crec');if(!b)return;b.onclick=()=>{b.style.display='none';
-  $('#crecf').innerHTML=`<div class="card" style="margin-top:12px"><div class="m">Avise a Logística para recolher esta ferramenta e levá-la de volta ao CIMI.</div><label>Seu nome completo</label><input id="rn" value="${esc(i.pessoa||'')}"><label>Observação (opcional)</label><textarea id="ro" rows="2" placeholder="Ex.: serviço concluído, pode buscar"></textarea><p class="err" id="rerr"></p><button class="btn" style="width:100%" id="rok">Enviar pedido de recolhimento</button></div>`;
+  $('#crecf').innerHTML=`<div class="card" style="margin-top:12px"><div class="m">Avise a Logística para recolher esta ferramenta e levá-la de volta ao CIMI.</div><label>Seu nome completo</label><input id="rn" value="${esc(i.pessoa||'')}"><label>Observação (opcional)</label><textarea id="ro" rows="2" placeholder="Ex.: serviço concluído, está na sala do encarregado"></textarea><label>📷 Foto de onde está a ferramenta e do que deve ser recolhido (opcional, ajuda a Logística)</label><input type="file" id="rfp" accept="image/*"><div id="rpp" style="margin:8px 0"></div><p class="err" id="rerr"></p><button class="btn" style="width:100%" id="rok">Enviar pedido de recolhimento</button></div>`;
+  $('#rfp').onchange=()=>{const f=$('#rfp').files[0];$('#rpp').innerHTML=f?`<img src="${URL.createObjectURL(f)}" style="max-width:100%;max-height:220px;border-radius:10px">`:''};
   $('#rok').onclick=async()=>{const nm=$('#rn').value.trim(),ob=$('#ro').value.trim();if(nm.length<3)return $('#rerr').textContent='Informe seu nome completo.';
-   $('#rok').disabled=true;const {data,error}=await sb.rpc('recolhimento_solicitar',{p_token:tk,p_nome:nm,p_obs:ob});
+   $('#rok').disabled=true;let fu=null;const rf=$('#rfp').files[0];
+   if(rf){try{$('#rerr').textContent='Enviando foto…';const bl=await shrink(rf),pa=`confirmacoes/${tk}/pedido-${Date.now()}.jpg`;const {error:ue}=await sb.storage.from('fotos').upload(pa,bl,{contentType:'image/jpeg'});if(ue)throw ue;fu=sb.storage.from('fotos').getPublicUrl(pa).data.publicUrl;$('#rerr').textContent=''}
+    catch(e){$('#rok').disabled=false;return $('#rerr').textContent='Não foi possível enviar a foto: '+(e.message||e)}}
+   const {data,error}=await sb.rpc('recolhimento_solicitar',{p_token:tk,p_nome:nm,p_obs:ob,p_foto:fu});
    if(error){$('#rok').disabled=false;return $('#rerr').textContent='Erro: '+error.message}
    if(data==='ok'||data==='ja_solicitado')return confirmView(tk);
    $('#rok').disabled=false;$('#rerr').textContent=data==='nao_aplicavel'?'Esta ferramenta já não está mais neste local.':'Não foi possível enviar o pedido.'}}};
