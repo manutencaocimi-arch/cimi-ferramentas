@@ -495,6 +495,19 @@ function locais(){const t=q.toLowerCase();const todos=[GR_CIMI,...GRUPOS,'Sem gr
 const FCOR=['#2b6cb0','#d6457a','#2e9e4f','#7b4fc4','#c2410c','#0f8f8f','#8a6d3b'];
 const fcor=id=>FCOR[Math.max(0,D.fn.findIndex(x=>x.id===id))%FCOR.length];
 let fSel='todas';
+function verPessoaF(id){const p=D.p.find(x=>x.id===id);if(!p)return;
+ const fs=D.f.filter(f=>f.status==='em_uso'&&f.responsavel_atual===p.nome);
+ const mvDe=f=>{const ms=D.m.filter(y=>y.ferramenta_id===f.id&&y.tipo==='retirada').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));return ms.find(y=>y.pessoa===p.nome)||ms[0]||null};
+ const m=document.createElement('div');m.className='mask';m.addEventListener('click',e=>{if(e.target===m)m.remove()});
+ m.innerHTML=`<div class="modal" style="max-width:560px"><h3>🧰 Ferramentas com ${esc(p.nome)}</h3><div class="m" style="margin-bottom:8px">${esc(FN(p.funcao_id)?.nome||'')} · ${fs.length} ferramenta${fs.length===1?'':'s'} agora</div>
+ ${fs.map(f=>{const x=mvDe(f),loc=L(f.local_atual_id),rec=recAtiva(f.id);
+  return`<div class="tl" style="border-left-color:var(--o)"><div><b>${esc(f.nome)}</b> <span class="m">${esc(f.patrimonio||'')}</span></div>
+  <div>📍 <b>${esc(loc?.nome||'—')}</b>${loc?.grupo?` <span class="m">(${esc(loc.grupo)})</span>`:''}</div>
+  ${x?`<div class="m">${x.via_logistica?`🚚 Entregue pela Logística (${esc(x.logistica_nome||'—')})`:'📤 Retirada direta'} · ${fmt(x.created_at)} · ${dias(x)}</div>
+  ${x.via_logistica?`<div style="margin-top:4px">${x.conf_status==='confirmada'?'<span class="bd disponivel">✔ Recebimento confirmado</span>':x.conf_status==='contestada'?'<span class="bd baixa">⚠ Divergência</span>':'<span class="bd em_uso">⏳ Aguardando confirmação</span>'}</div>`:''}`:''}
+  ${rec?`<div style="margin-top:4px"><span class="bd em_uso" style="white-space:normal;display:inline-block">${rec.status==='recolhido'?'🚚 Recolhido pela Logística — a caminho do CIMI':'🔔 Recolhimento solicitado'}</span></div>`:''}
+  <div class="acts" style="margin-top:6px">${x?.foto_url?`<img class="ph" src="${esc(x.foto_url)}" onclick="foto('${esc(x.foto_url)}')">`:''}${x?`<button class="btn s o" onclick="this.closest('.mask').remove();movDet('${x.id}')">🔎 Ver percurso completo</button>`:''}</div></div>`}).join('')||'<p class="m">Nenhuma ferramenta com esta pessoa no momento.</p>'}
+ <button class="btn o" style="margin-top:10px" onclick="this.closest('.mask').remove()">Fechar</button></div>`;document.body.appendChild(m)}
 function pessoas(){const t=q.toLowerCase();if(fSel!=='todas'&&!FN(fSel))fSel='todas';
  const com=p=>D.f.filter(f=>f.status==='em_uso'&&f.responsavel_atual===p.nome).length;
  const r=D.p.filter(p=>(fSel==='todas'||p.funcao_id===fSel)&&`${p.nome} ${FN(p.funcao_id)?.nome}`.toLowerCase().includes(t));
@@ -503,7 +516,7 @@ function pessoas(){const t=q.toLowerCase();if(fSel!=='todas'&&!FN(fSel))fSel='to
  <div class="bar"><input id="q" placeholder="🔎 Buscar pessoa ou função..." value="${esc(q)}"><button class="btn" onclick="novaP()">+ Nova pessoa</button></div>
  <div class="lg">${r.map((p,i)=>{const c=fcor(p.funcao_id),n=com(p);return`<div class="tile" style="--c:${c};animation-delay:${Math.min(i,12)*30}ms;${p.ativo?'':'opacity:.55'}">
   <div style="display:flex;gap:10px;align-items:center"><div style="width:40px;height:40px;border-radius:50%;background:${c};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800">${esc(p.nome.trim()[0]||'?')}</div><b>${esc(p.nome)}</b></div>
-  <div><span class="pill" style="background:${c};color:#fff">${esc(FN(p.funcao_id)?.nome||'Sem função')}</span> ${p.ativo?'':'<span class="pill">Inativo</span> '}${p.logistica?`<span class="pill">🚚 Logística ${p.logistica==='fixo'?'(fixo)':'(eventual)'}</span> `:''}${n?`<span class="pill u">🧰 ${n} com ele(a)</span>`:''}</div>
+  <div><span class="pill" style="background:${c};color:#fff">${esc(FN(p.funcao_id)?.nome||'Sem função')}</span> ${p.ativo?'':'<span class="pill">Inativo</span> '}${p.logistica?`<span class="pill">🚚 Logística ${p.logistica==='fixo'?'(fixo)':'(eventual)'}</span> `:''}${n?`<button class="pill u" style="border:0;cursor:pointer;font:inherit;font-size:12px;font-weight:700" title="Ver quais ferramentas estão com esta pessoa e onde" onclick="verPessoaF('${p.id}')">🧰 ${n} com ele(a) ▸</button>`:''}</div>
   <div class="acts"><button class="btn s o" onclick="act(editP,'${p.id}',D.p)">✏️ Editar</button></div></div>`}).join('')||'<p class="m">Nenhuma pessoa encontrada.</p>'}</div>`}
 function funcoes(){return`<div class="bar"><div class="m" style="flex:1;align-self:center">Funções disponíveis para as pessoas cadastradas.</div><button class="btn" onclick="novaFn()">+ Nova função</button></div>
  <div class="lg">${D.fn.map((x,i)=>{const c=fcor(x.id),n=D.p.filter(p=>p.funcao_id===x.id).length;return`<div class="tile" style="--c:${c};animation-delay:${i*30}ms"><b>🏷️ ${esc(x.nome)}</b><div><span class="pill">${n} ${n===1?'pessoa':'pessoas'}</span></div>
