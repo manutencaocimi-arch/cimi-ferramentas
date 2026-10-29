@@ -103,7 +103,7 @@ function acessos(){if(AC===null){carregaAC();return'<p class="m">Carregando aces
  return`<div class="card m" style="margin-bottom:12px">🔒 Senhas que o <strong>próprio usuário</strong> escolheu ficam criptografadas e não podem ser vistas por ninguém, só redefinidas. Já a <strong>senha provisória</strong> (a que você define ou a enviada por e-mail) fica visível aqui até o usuário trocá-la.</div>
  <div class="bar"><input id="q" placeholder="🔎 Buscar usuário ou login..." value="${esc(q)}"><button class="btn o" onclick="AC=null;render()">↻ Atualizar</button></div>
  <div class="tw"><table><tr><th>Usuário</th><th>Login</th><th>E-mail de recuperação</th><th>Papel</th><th>Senha</th><th>Último acesso</th><th>Ações</th></tr>
- ${r.map(u=>`<tr><td><b>${esc(u.nome)}</b></td><td>${esc(u.email)}</td><td>${esc(u.email_contato||'—')}</td><td>${esc(u.papel)}</td>
+ ${r.map(u=>`<tr><td><a href="#" title="Ver acessos, movimentações e edições" onclick="verUsuario('${u.id}');return false" style="color:var(--gd);text-decoration:underline"><b>${esc(u.nome)}</b></a></td><td>${esc(u.email)}</td><td>${esc(u.email_contato||'—')}</td><td>${esc(u.papel)}</td>
  <td>${u.papel==='principal'?'—':u.senha_provisoria?`<span class="bd em_uso">Provisória</span> <button class="btn s o" onclick="verSenha('${u.id}')">👁 Ver</button>`:u.trocar_senha?'<span class="bd em_uso">Provisória</span><div class="m">não registrada</div>':'<span class="bd disponivel">Definida pelo usuário</span><div class="m">oculta (só dá para redefinir)</div>'}</td><td>${u.ultimo_acesso?fmt(u.ultimo_acesso):'nunca'}</td>
  <td class="acts"><button class="btn s y" onclick="novaSenha('${u.id}')">🔑 Nova senha</button><button class="btn s o" onclick="emailAC('${u.id}')">✉️ E-mail</button></td></tr>`).join('')||`<tr><td colspan=7 class="${ACerr?'err':'m'}">${ACerr?'Não foi possível carregar os usuários: '+esc(ACerr)+'. Confirme que a função "acessos" foi publicada no Supabase e clique em ↻ Atualizar.':'Nenhum usuário.'}</td></tr>`}</table></div>`}
 function novaSenha(id){const u=AC.find(x=>x.id===id),a='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -115,6 +115,17 @@ function novaSenha(id){const u=AC.find(x=>x.id===id),a='abcdefghjkmnpqrstuvwxyzA
   const r=await api('definir_senha',{id,senha:v.nova,enviar:v.enviar==='1'});AC=null;
   alert(`Senha provisória de ${u.nome}:\n\n${v.nova}\n\nO usuário deverá trocá-la no próximo acesso.${r.aviso?'\n\n⚠️ '+r.aviso:''}`)})}
 function verSenha(id){const u=AC.find(x=>x.id===id);alert(`Senha provisória de ${u.nome}:\n\n${u.senha_provisoria}`)}
+async function verUsuario(id){const u=AC.find(x=>x.id===id);if(!u)return;const m=document.createElement('div');m.className='mask';m.addEventListener('click',e=>{if(e.target===m)m.remove()});
+ const cab=`<h3>👤 ${esc(u.nome)}</h3><div class="m">${esc(u.email)} · ${esc(u.papel)} · último acesso: ${u.ultimo_acesso?fmt(u.ultimo_acesso):'nunca'}</div>`;
+ m.innerHTML=`<div class="modal" style="max-width:820px">${cab}<p class="m">Carregando histórico…</p></div>`;document.body.appendChild(m);
+ const q=t=>sb.from(t).select('*').eq('usuario_id',id).order('created_at',{ascending:false}).limit(500);
+ const [a,mv,ed]=await Promise.all([q('acessos_log'),q('movimentacoes'),q('edicoes')]);
+ const box=(tit,r,head,fn,vazio)=>`<h4 style="margin:18px 0 6px">${tit} (${r.length})</h4>${r.length?`<div class="tw" style="max-height:260px"><table><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr>${r.map(fn).join('')}</table></div>`:`<p class="m">${vazio}</p>`}`;
+ const ag=s=>{s=String(s||'');return /Mobile|Android|iPhone/i.test(s)?'📱 Celular':s?'💻 Computador':'—'};
+ const sA=a.error?`<h4 style="margin:18px 0 6px">🔑 Acessos</h4><p class="err">Não foi possível carregar os acessos (${esc(a.error.message)}). Crie a tabela "acessos_log" no Supabase.</p>`:box('🔑 Acessos (logins)',a.data||[],['Data e hora','Dispositivo'],x=>`<tr><td>${fmt(x.created_at)}</td><td>${ag(x.agente)}</td></tr>`,'Nenhum acesso registrado ainda (só são gravados os logins feitos após esta atualização).');
+ const sM=box('🕘 Movimentações',mv.data||[],['Quando','Tipo','Ferramenta','Saiu de','Foi para','Pessoa'],x=>`<tr><td>${fmt(x.created_at)}</td><td><span class="bd ${x.tipo}">${x.tipo}</span></td><td>${esc(F(x.ferramenta_id)?.nome||'—')}<div class="m">${esc(F(x.ferramenta_id)?.patrimonio||'')}</div></td>${rotaTd(x)}<td>${esc(x.pessoa)}</td></tr>`,'Nenhuma movimentação registrada por este usuário.');
+ const sE=box('✏️ Edições',ed.data||[],['Quando','Onde','Campo','De → Para'],x=>`<tr><td>${fmt(x.created_at)}</td><td>${esc(x.tabela)}: ${esc(x.registro)}</td><td>${esc(x.campo)}</td><td>${esc(x.valor_antigo||'∅')} → <b>${esc(x.valor_novo||'∅')}</b></td></tr>`,'Nenhuma edição registrada por este usuário.');
+ m.innerHTML=`<div class="modal" style="max-width:820px">${cab}<div class="cards" style="margin-top:12px"><div class="card"><b>${(a.data||[]).length}</b><span>Acessos</span></div><div class="card"><b>${(mv.data||[]).length}</b><span>Movimentações</span></div><div class="card"><b>${(ed.data||[]).length}</b><span>Edições</span></div></div>${sA}${sM}${sE}<div class="acts" style="margin-top:16px"><button class="btn o" onclick="this.closest('.mask').remove()">Fechar</button></div></div>`}
 function emailAC(id){const u=AC.find(x=>x.id===id);form(`E-mail de recuperação: ${esc(u.nome)}`,[{k:'email',l:'E-mail',t:'email',value:u.email_contato}],'Salvar',async v=>{
  await api('definir_email',{id,email:v.email});AC=null;toast('E-mail salvo ✔')})}
 
@@ -123,8 +134,9 @@ function loginView(msg=''){ $('#app').innerHTML=`<div class="login"><h2>🛠️ 
 <label for="em">Usuário ou e-mail</label><input id="em" name="username" type="text" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="ex.: marcelo.melo">
 <label for="pw">Senha</label><div style="display:flex;gap:6px"><input id="pw" name="password" type="password" autocomplete="current-password" style="flex:1"><button type="button" class="btn o" id="ver" title="Mostrar senha">👁</button></div>
 <p class="err">${msg}</p><button class="btn" style="width:100%" id="go">Entrar</button><p style="text-align:center;margin:14px 0 0"><a href="#" onclick="esqueci();return false" style="color:var(--gd);font-size:14px">Esqueci minha senha</a></p></div>`;
- const go=async()=>{const b=$('#go');b.disabled=true;const {error}=await sb.auth.signInWithPassword({email:comDom($('#em').value),password:$('#pw').value});
-  if(error){b.disabled=false;return loginView('E-mail ou senha inválidos.')}start()};
+ const go=async()=>{const b=$('#go');b.disabled=true;const {data,error}=await sb.auth.signInWithPassword({email:comDom($('#em').value),password:$('#pw').value});
+  if(error){b.disabled=false;return loginView('E-mail ou senha inválidos.')}
+  try{await sb.from('acessos_log').insert({usuario_id:data.user.id,email:data.user.email,agente:navigator.userAgent})}catch(e){}start()};
  $('#go').onclick=go;$('#pw').addEventListener('keydown',e=>{if(e.key==='Enter')go()});$('#em').addEventListener('keydown',e=>{if(e.key==='Enter')$('#pw').focus()});
  $('#ver').onclick=()=>{const p=$('#pw');p.type=p.type==='password'?'text':'password';p.focus()};$('#em').focus()}
 async function start(){
