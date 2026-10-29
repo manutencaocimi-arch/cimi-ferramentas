@@ -15,7 +15,7 @@ header h1{font-size:18px;margin:0;flex:1}header small{opacity:.9}
 nav{display:flex;gap:6px;padding:10px 18px;background:#fff;border-bottom:1px solid var(--b);overflow-x:auto}
 nav button{border:0;background:none;padding:8px 14px;border-radius:20px;cursor:pointer;font-weight:600;color:var(--m);white-space:nowrap}
 nav button.on{background:var(--g);color:#fff}
-main{max-width:1150px;margin:0 auto;padding:16px}
+main{width:100%;max-width:1800px;margin:0 auto;padding:16px 28px}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
 .card{background:var(--c);border-radius:12px;padding:14px;border:1px solid var(--b)}
 .card b{font-size:28px;display:block}.card span{color:var(--m);font-size:13px}
@@ -23,7 +23,7 @@ main{max-width:1150px;margin:0 auto;padding:16px}
 input,select,textarea{width:100%;padding:10px;border:1px solid var(--b);border-radius:8px;font:inherit;background:#fff}
 .bar input{flex:1;min-width:180px;width:auto}.bar select{width:auto}
 .btn{background:var(--g);color:#fff;border:0;padding:9px 14px;border-radius:8px;font-weight:600;cursor:pointer}
-.btn.s{padding:6px 10px;font-size:13px}.btn.o{background:#fff;color:var(--g);border:1px solid var(--g)}.btn.r{background:var(--r)}.btn.y{background:var(--o)}.btn:disabled{opacity:.5}
+.btn{white-space:nowrap}.btn.s{padding:6px 10px;font-size:13px}.btn.o{background:#fff;color:var(--g);border:1px solid var(--g)}.btn.r{background:var(--r)}.btn.y{background:var(--o)}.btn:disabled{opacity:.5}
 .tw{background:var(--c);border:1px solid var(--b);border-radius:12px;overflow:auto}
 table{width:100%;border-collapse:collapse}th,td{padding:10px;text-align:left;border-bottom:1px solid var(--b);vertical-align:middle}
 th{font-size:12px;text-transform:uppercase;color:var(--m);background:#f8faf9;position:sticky;top:0}
@@ -157,7 +157,7 @@ async function relMov(tipo){let w=null;try{if(tipo==='print'){w=window.open('','
  catch(e){if(w)w.close();toast('Erro: '+(e.message||e))}}
 async function verUsuario(id){const u=id?AC.find(x=>x.id===id):null,nm=u?u.nome:'Todos os usuários';
  const m=document.createElement('div');m.className='mask';m.addEventListener('click',e=>{if(e.target===m)m.remove()});
- m.innerHTML=`<div class="modal" style="max-width:920px"><h3>${u?'👤':'📋'} ${esc(nm)}</h3><div class="m">${u?esc(u.email)+' · '+esc(u.papel)+' · último acesso: '+(u.ultimo_acesso?fmt(u.ultimo_acesso):'nunca'):'Relatório geral: acessos, movimentações e edições de todos os usuários'}</div>
+ m.innerHTML=`<div class="modal" style="max-width:min(1400px,96vw)"><h3>${u?'👤':'📋'} ${esc(nm)}</h3><div class="m">${u?esc(u.email)+' · '+esc(u.papel)+' · último acesso: '+(u.ultimo_acesso?fmt(u.ultimo_acesso):'nunca'):'Relatório geral: acessos, movimentações e edições de todos os usuários'}</div>
  <div class="bar" style="margin-top:12px;align-items:flex-end"><div><label>De</label><input type="date" id="rd1" style="width:auto"></div><div><label>Até</label><input type="date" id="rd2" style="width:auto"></div>
  <button class="btn y" id="rprt">🖨️ Imprimir</button><button class="btn" id="rpdf">📄 Baixar PDF</button><button class="btn o" id="rxls">📊 Baixar Excel</button></div><div id="rb"><p class="m">Carregando histórico…</p></div>
  <div class="acts" style="margin-top:16px"><button class="btn o" onclick="this.closest('.mask').remove()">Fechar</button></div></div>`;document.body.appendChild(m);
@@ -170,7 +170,7 @@ async function verUsuario(id){const u=id?AC.find(x=>x.id===id):null,nm=u?u.nome:
    {t:'Movimentações',head:['Data e hora','Usuário','Tipo','Ferramenta','Patrimônio','Saiu de','Foi para','Pessoa'],rows:mm.map(x=>{const [p,q]=rota(x);return[fmt(x.created_at),un(x),x.tipo,F(x.ferramenta_id)?.nome||'-',F(x.ferramenta_id)?.patrimonio||'',L(p)?.nome||'-',L(q)?.nome||'-',x.pessoa||'']})},
    {t:'Edições',head:['Data e hora','Usuário','Onde','Campo','De','Para'],rows:fl(E).map(x=>[fmt(x.created_at),un(x),x.tabela+': '+x.registro,x.campo,x.valor_antigo||'-',x.valor_novo||'-'])}]};
  const show=()=>{const bl=blocos();m.querySelector('#rb').innerHTML=`<div class="cards" style="margin-top:12px">${bl.map(b=>`<div class="card"><b>${b.rows.length}</b><span>${b.t}</span></div>`).join('')}</div>`+(errA?`<p class="err">Acessos indisponíveis: ${esc(errA)}. Crie a tabela "acessos_log" no Supabase.</p>`:'')+
-  bl.map(b=>`<h4 style="margin:16px 0 6px">${b.t} (${b.rows.length})</h4>${b.rows.length?`<div class="tw" style="max-height:240px"><table><tr>${b.head.map(h=>`<th>${h}</th>`).join('')}</tr>${b.rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table></div>`:'<p class="m">Nenhum registro no período.</p>'}`).join('')};
+  bl.map(b=>`<h4 style="margin:16px 0 6px">${b.t} (${b.rows.length})</h4>${b.rows.length?`<div class="tw" style="max-height:340px"><table><tr>${b.head.map(h=>`<th>${h}</th>`).join('')}</tr>${b.rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table></div>`:'<p class="m">Nenhum registro no período.</p>'}`).join('')};
  const baixa=t=>{let w=null;try{if(t==='print'){w=window.open('','_blank');if(!w)return toast('O navegador bloqueou a janela de impressão. Permita pop-ups para este site.')}const d1=m.querySelector('#rd1').value,d2=m.querySelector('#rd2').value;baixar(t,'relatorio_'+slug(nm)+(d1?'_de_'+d1:'')+(d2?'_ate_'+d2:''),'Relatório de usuário - '+nm,periodo(d1,d2),blocos(),w)}catch(e){if(w)w.close();toast('Erro: '+(e.message||e))}};
  m.querySelector('#rd1').onchange=m.querySelector('#rd2').onchange=show;m.querySelector('#rprt').onclick=()=>baixa('print');m.querySelector('#rpdf').onclick=()=>baixa('pdf');m.querySelector('#rxls').onclick=()=>baixa('xlsx');show()}
 function emailAC(id){const u=AC.find(x=>x.id===id);form(`E-mail de recuperação: ${esc(u.nome)}`,[{k:'email',l:'E-mail',t:'email',value:u.email_contato}],'Salvar',async v=>{
