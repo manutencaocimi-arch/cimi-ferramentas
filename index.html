@@ -70,6 +70,7 @@ const L=id=>D.l.find(x=>x.id===id),F=id=>D.f.find(x=>x.id===id),FN=id=>D.fn.find
 const cimi=()=>D.l.find(x=>x.tipo==='estoque');
 
 // ---------- Acesso: API admin, troca de senha, recuperação ----------
+const DOMINIO='@redemobconsorcio.com.br',comDom=s=>{s=String(s||'').trim().toLowerCase();return !s||s.includes('@')?s:s+DOMINIO};
 const API_URL=SUPABASE_URL+'/functions/v1/acessos';
 async function api(action,body={}){const {data:{session}}=await sb.auth.getSession();
  let r;try{r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,Authorization:'Bearer '+(session?.access_token||SUPABASE_KEY)},body:JSON.stringify({action,...body})})}catch(e){throw new Error('sem conexão com a função "acessos" do Supabase (ela precisa estar publicada com esse nome exato e com a verificação de JWT desligada)')}
@@ -81,8 +82,8 @@ function trocarView(msg=''){$('#app').innerHTML=`<div class="login"><h2>🔒 Def
  $('#sv').onclick=async()=>{const a=$('#n1').value,b=$('#n2').value;if(a.length<6)return trocarView('Use ao menos 6 caracteres.');if(a!==b)return trocarView('As senhas não conferem.');
   const {error}=await sb.auth.updateUser({password:a});if(error)return trocarView(error.message);
   await api('senha_trocada').catch(()=>{});await sb.from('profiles').update({trocar_senha:false}).eq('id',me.id);start()}}
-function esqueci(){form('Recuperar senha',[{k:'login',l:'Login (e-mail de acesso)'},{k:'email',l:'E-mail cadastrado, para receber a senha provisória',t:'email'}],'Enviar',async v=>{
- if(!v.login||!v.email)return'Preencha os dois campos.';await api('recuperar',v);toast('Se os dados conferirem, a senha provisória foi enviada.')})}
+function esqueci(){form('Recuperar senha',[{k:'login',l:'Usuário (ex.: marcelo.melo)'},{k:'email',l:'E-mail cadastrado, para receber a senha provisória',t:'email'}],'Enviar',async v=>{
+ if(!v.login||!v.email)return'Preencha os dois campos.';await api('recuperar',{...v,login:comDom(v.login)});toast('Se os dados conferirem, a senha provisória foi enviada.')})}
 const rota=x=>{const c=cimi()?.id;return x.tipo==='retirada'?[c,x.local_id]:[x.local_id,c]};
 const rotaTd=x=>{const [a,b]=rota(x);return`<td>${esc(L(a)?.nome||'—')}</td><td>${esc(L(b)?.nome||'—')}</td>`};
 const dd=d=>{const t=new Date(d);return new Date(t.getFullYear(),t.getMonth(),t.getDate())};
@@ -117,10 +118,10 @@ function emailAC(id){const u=AC.find(x=>x.id===id);form(`E-mail de recuperação
 
 // ---------- Login ----------
 function loginView(msg=''){ $('#app').innerHTML=`<div class="login"><h2>🛠️ CIMI · Ferramentas</h2>
-<label for="em">E-mail</label><input id="em" name="username" type="email" autocomplete="username">
+<label for="em">Usuário ou e-mail</label><input id="em" name="username" type="text" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="ex.: marcelo.melo">
 <label for="pw">Senha</label><div style="display:flex;gap:6px"><input id="pw" name="password" type="password" autocomplete="current-password" style="flex:1"><button type="button" class="btn o" id="ver" title="Mostrar senha">👁</button></div>
 <p class="err">${msg}</p><button class="btn" style="width:100%" id="go">Entrar</button><p style="text-align:center;margin:14px 0 0"><a href="#" onclick="esqueci();return false" style="color:var(--gd);font-size:14px">Esqueci minha senha</a></p></div>`;
- const go=async()=>{const b=$('#go');b.disabled=true;const {error}=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});
+ const go=async()=>{const b=$('#go');b.disabled=true;const {error}=await sb.auth.signInWithPassword({email:comDom($('#em').value),password:$('#pw').value});
   if(error){b.disabled=false;return loginView('E-mail ou senha inválidos.')}start()};
  $('#go').onclick=go;$('#pw').addEventListener('keydown',e=>{if(e.key==='Enter')go()});$('#em').addEventListener('keydown',e=>{if(e.key==='Enter')$('#pw').focus()});
  $('#ver').onclick=()=>{const p=$('#pw');p.type=p.type==='password'?'text':'password';p.focus()};$('#em').focus()}
