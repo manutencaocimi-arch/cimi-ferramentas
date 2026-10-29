@@ -71,7 +71,7 @@ const cimi=()=>D.l.find(x=>x.tipo==='estoque');
 // ---------- Acesso: API admin, troca de senha, recuperação ----------
 const API_URL=SUPABASE_URL+'/functions/v1/acessos';
 async function api(action,body={}){const {data:{session}}=await sb.auth.getSession();
- const r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,Authorization:'Bearer '+(session?.access_token||SUPABASE_KEY)},body:JSON.stringify({action,...body})});
+ let r;try{r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,Authorization:'Bearer '+(session?.access_token||SUPABASE_KEY)},body:JSON.stringify({action,...body})})}catch(e){throw new Error('sem conexão com a função "acessos" do Supabase (ela precisa estar publicada com esse nome exato e com a verificação de JWT desligada)')}
  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Falha na requisição');return j}
 function trocarView(msg=''){$('#app').innerHTML=`<div class="login"><h2>🔒 Defina sua nova senha</h2><p class="m">Por segurança, troque a senha provisória antes de continuar.</p>
 <label for="n1">Nova senha (mín. 6 caracteres)</label><input id="n1" type="password" autocomplete="new-password">
