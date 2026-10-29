@@ -62,6 +62,8 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=d=>new Date(d).toLocaleString('pt-BR');
 const ST={disponivel:'Disponível (CIMI)',em_uso:'Em uso',baixa:'Baixa'};
+let usoSel='todos';
+const USOS=[['Manutenção','🔧','#2b6cb0'],['Pintura','🎨','#d6457a'],['Jardinagem','🌿','#2e9e4f']];
 let gSel='todos';const GR_CIMI='CIMI (Estoque)';
 const GRUPOS=['Estações BRT Norte Sul','Estações BRT Leste Oeste','Terminais Estações BRT Leste - Oeste','Terminais Estações BRT Norte - Sul','Terminais Primitivos',"PA'S"];
 const tipoDe=g=>g===GR_CIMI?'estoque':g.startsWith('Terminais')?'terminal':g==="PA'S"?'pa':'estacao';
@@ -182,13 +184,14 @@ function entregar(f){form(`Devolver ao CIMI: ${esc(f.nome)}`,[...pessoaFields(D.
   let r=await sb.from('movimentacoes').insert({ferramenta_id:f.id,tipo:'entrega',local_id:f.local_atual_id,pessoa:nome,pessoa_id:p?.id||null,foto_url:url,obs:v.obs,usuario_id:me.id,usuario_nome:me.nome});if(r.error)throw r.error;
   r=await sb.from('ferramentas').update({status:'disponivel',local_atual_id:cimi()?.id,responsavel_atual:null}).eq('id',f.id);if(r.error)throw r.error;toast('Entrega registrada ✔')})}
 const fFields=f=>[{k:'nome',l:'Nome',value:f?.nome},{k:'patrimonio',l:'Patrimônio',value:f?.patrimonio},{k:'serie',l:'Nº de série',value:f?.serie},
- {k:'marca',l:'Marca',value:f?.marca},{k:'modelo',l:'Modelo',value:f?.modelo},{k:'obs',l:'Observação',t:'area',value:f?.obs}];
+ {k:'marca',l:'Marca',value:f?.marca},{k:'modelo',l:'Modelo',value:f?.modelo},
+ {k:'uso',l:'Tipo de uso',t:'select',value:f?.uso||'',opts:[['','— Sem classificação —'],...USOS.map(u=>[u[0],u[1]+' '+u[0]])]},{k:'obs',l:'Observação',t:'area',value:f?.obs}];
 function novaF(){form('Nova ferramenta',fFields(),'Cadastrar',async v=>{if(!v.nome)return'Informe o nome.';
- const {error}=await sb.from('ferramentas').insert({...v,status:'disponivel',local_atual_id:cimi()?.id});if(error)throw error;toast('Cadastrada ✔')})}
+ const {error}=await sb.from('ferramentas').insert({...v,uso:v.uso||null,status:'disponivel',local_atual_id:cimi()?.id});if(error)throw error;toast('Cadastrada ✔')})}
 function editF(f){form(`Editar: ${esc(f.nome)}`,[...fFields(f),{k:'status',l:'Status',t:'select',value:f.status,opts:Object.entries(ST)},{k:'motivo_baixa',l:'Motivo da baixa (obrigatório)',t:'area',value:f.motivo_baixa},pwField],'Salvar edição',async v=>{
  if(!await checkPw(v.senha))return'Senha incorreta.';const diffs=[];const n={};
  if(v.status==='baixa'&&!v.motivo_baixa)return'Informe o motivo da baixa.';if(v.status!=='baixa')v.motivo_baixa='';
- ['nome','patrimonio','serie','marca','modelo','obs','status','motivo_baixa'].forEach(k=>{if((f[k]??'')!==v[k]){diffs.push([k,f[k],v[k]]);n[k]=v[k]}});
+ ['nome','patrimonio','serie','marca','modelo','uso','obs','status','motivo_baixa'].forEach(k=>{if((f[k]??'')!==v[k]){diffs.push([k,f[k],v[k]]);n[k]=v[k]}});
  if(!diffs.length)return'Nada foi alterado.';const {error}=await sb.from('ferramentas').update(n).eq('id',f.id);if(error)throw error;
  await logEdit('ferramentas',f.nome+(f.patrimonio?' ('+f.patrimonio+')':''),diffs);toast('Edição registrada ✔')});
  const m=document.body.lastElementChild,st=m.querySelector('[name=status]'),mo=m.querySelector('[name=motivo_baixa]'),lb=mo.previousElementSibling;
@@ -229,13 +232,16 @@ function render(){
  <nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';q='';render()">${t[1]}</button>`).join('')}</nav><main>${{painel,hist:histView,locais,pessoas,funcoes,edic,acessos}[tab]()}</main>`;
  const s=$('#q');if(s){s.oninput=e=>{q=e.target.value;const p=e.target.selectionStart;render();const n=$('#q');n.focus();n.setSelectionRange(p,p)}}}
 function painel(){const c=k=>D.f.filter(x=>x.status===k).length;
- const list=D.f.filter(x=>(flt==='todos'||x.status===flt)&&(`${x.nome} ${x.patrimonio} ${x.marca} ${x.modelo} ${x.responsavel_atual} ${L(x.local_atual_id)?.nome}`).toLowerCase().includes(q.toLowerCase()));
- return`<div class="cards"><div class="card"><b>${D.f.length}</b><span>Total</span></div><div class="card"><b style="color:var(--g)">${c('disponivel')}</b><span>Disponíveis no CIMI</span></div>
+ const nU=u=>D.f.filter(x=>u==='sem'?!x.uso:x.uso===u).length;
+ const uCard=(id,ic,nome,cor,n)=>`<button class="gc ${usoSel===id?'on':''}" style="--c:${cor}" onclick="usoSel='${id}';render()"><span class="ic">${ic}</span><b>${nome}</b><span class="n">${n}</span> <span style="font-size:13px">ferramentas</span><div class="bar2"><i style="width:${D.f.length?Math.round(n/D.f.length*100):0}%"></i></div></button>`;
+ const usoBar=`<div class="gg">${uCard('todos','🧰','Todas','#1d2a22',D.f.length)}${USOS.map(u=>uCard(u[0],u[1],u[0],u[2],nU(u[0]))).join('')}${nU('sem')?uCard('sem','❔','Sem classificação','#6b7a71',nU('sem')):''}</div>`;
+ const list=D.f.filter(x=>(usoSel==='todos'||(usoSel==='sem'?!x.uso:x.uso===usoSel))&&(flt==='todos'||x.status===flt)&&(`${x.nome} ${x.patrimonio} ${x.marca} ${x.modelo} ${x.responsavel_atual} ${L(x.local_atual_id)?.nome}`).toLowerCase().includes(q.toLowerCase()));
+ return`${usoBar}<div class="cards"><div class="card"><b>${D.f.length}</b><span>Total</span></div><div class="card"><b style="color:var(--g)">${c('disponivel')}</b><span>Disponíveis no CIMI</span></div>
  <div class="card"><b style="color:var(--o)">${c('em_uso')}</b><span>Em uso nos locais</span></div><div class="card"><b style="color:#888">${c('baixa')}</b><span>Baixa</span></div></div>
  <div class="bar"><input id="q" placeholder="🔎 Buscar ferramenta, patrimônio, local, pessoa..." value="${esc(q)}"><select onchange="flt=this.value;render()">${[['todos','Todos'],...Object.entries(ST)].map(o=>`<option value="${o[0]}" ${flt===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select>
  <button class="btn" onclick="novaF()">+ Nova ferramenta</button></div>
  <div class="tw"><table><tr><th>Ferramenta</th><th>Patrimônio</th><th>Status</th><th>Local atual</th><th>Com quem</th><th>Ações</th></tr>
- ${list.map(f=>`<tr><td><b>${esc(f.nome)}</b><div class="m">${esc([f.marca,f.modelo].filter(Boolean).join(' · '))}</div></td><td>${esc(f.patrimonio||'—')}</td>
+ ${list.map(f=>`<tr><td><b>${esc(f.nome)}</b><div class="m">${esc([f.marca,f.modelo].filter(Boolean).join(' · '))}</div>${f.uso?`<span class="pill">${esc((USOS.find(u=>u[0]===f.uso)||[,''])[1])} ${esc(f.uso)}</span>`:''}</td><td>${esc(f.patrimonio||'—')}</td>
  <td><span class="bd ${f.status}">${ST[f.status]}</span>${f.status==='baixa'&&f.motivo_baixa?`<div class="m" style="margin-top:4px;max-width:220px">${esc(f.motivo_baixa)}</div>`:''}</td><td>${esc(L(f.local_atual_id)?.nome||'—')}</td><td>${esc(f.responsavel_atual||'—')}</td>
  <td class="acts">${f.status==='disponivel'?`<button class="btn s y" onclick="act(retirar,'${f.id}',D.f)">Retirar</button>`:''}${f.status==='em_uso'?`<button class="btn s" onclick="act(entregar,'${f.id}',D.f)">Entregar</button>`:''}
  <button class="btn s o" onclick="act(hist,'${f.id}',D.f)">Histórico</button><button class="btn s o" onclick="act(editF,'${f.id}',D.f)">✏️</button></td></tr>`).join('')||'<tr><td colspan=6 class="m">Nenhuma ferramenta encontrada.</td></tr>'}</table></div>`}
