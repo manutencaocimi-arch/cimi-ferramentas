@@ -125,7 +125,11 @@ const noInt=(x,a,b)=>{const t=new Date(x.created_at);return(!a||t>=a)&&(!b||t<=b
 const br=s=>s?s.split('-').reverse().join('/'):'';
 const periodo=(a,b)=>a||b?`Período: ${a?br(a):'início'} a ${b?br(b):'hoje'}`:'Período: todos os registros';
 const slug=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\w.-]+/g,'_');
-function baixar(tipo,nome,titulo,sub,blocos){
+function imprimir(w,titulo,sub,blocos){const e=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+ w.document.open();w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${e(titulo)}</title><style>body{font:12px Arial,sans-serif;margin:18px;color:#111}h1{font-size:18px;margin:0 0 4px}h2{font-size:14px;margin:18px 0 6px}.s{color:#555;margin-bottom:8px}table{width:100%;border-collapse:collapse;font-size:10.5px}th,td{border:1px solid #bbb;padding:4px 6px;text-align:left;vertical-align:top}th{background:#2e9e4f;color:#fff}tr{page-break-inside:avoid}@page{size:A4 landscape;margin:10mm}</style></head><body><h1>${e(titulo)}</h1><div class="s">${e(sub)} · Gerado em ${e(fmt(new Date()))} por ${e(me.nome)}</div>${blocos.map(b=>`<h2>${e(b.t)} (${b.rows.length})</h2><table><thead><tr>${b.head.map(x=>`<th>${e(x)}</th>`).join('')}</tr></thead><tbody>${b.rows.map(r=>`<tr>${r.map(c=>`<td>${e(c)}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${b.head.length}">Nenhum registro no período</td></tr>`}</tbody></table>`).join('')}</body></html>`);
+ w.document.close();w.focus();setTimeout(()=>w.print(),400)}
+function baixar(tipo,nome,titulo,sub,blocos,w){
+ if(tipo==='print')return imprimir(w,titulo,sub,blocos);
  if(typeof XLSX==='undefined'||!window.jspdf)throw new Error('as bibliotecas de PDF/Excel não carregaram (verifique a conexão com a internet)');
  if(tipo==='xlsx'){const wb=XLSX.utils.book_new();
   blocos.forEach(b=>{const ws=XLSX.utils.aoa_to_sheet([[titulo],[sub+' · Gerado em '+fmt(new Date())+' por '+me.nome],[],b.head,...b.rows]);
@@ -147,15 +151,15 @@ function movRows(src,all){const nx={},by={};all.forEach(x=>(by[x.ferramenta_id]=
  return src.map(x=>{const p=nx[x.id],fim=p?new Date(p.created_at):new Date(),n=Math.round((dd(fim)-dd(x.created_at))/864e5),[a,b]=rota(x);
   return[fmt(x.created_at),x.tipo,F(x.ferramenta_id)?.nome||'-',F(x.ferramenta_id)?.patrimonio||'',L(a)?.nome||'-',L(b)?.nome||'-',n+(p?'':' (até hoje)'),x.pessoa||'',x.usuario_nome||'',x.obs||'']})}
 const MOVH=['Quando','Tipo','Ferramenta','Patrimônio','Saiu de','Foi para','Dias no destino','Pessoa','Registrado por','Observação'];
-async function relMov(tipo){try{toast('Gerando relatório…');const all=await fetchAll('movimentacoes');
+async function relMov(tipo){let w=null;try{if(tipo==='print'){w=window.open('','_blank');if(!w)return toast('O navegador bloqueou a janela de impressão. Permita pop-ups para este site.')}toast('Gerando relatório…');const all=await fetchAll('movimentacoes');
  const rows=movRows(mvFiltrado(all),all),loc=MV.loc==='todos'?'Todos os locais':L(MV.loc)?.nome||'';
- baixar(tipo,'movimentacoes_'+slug(loc)+(MV.de?'_de_'+MV.de:'')+(MV.ate?'_ate_'+MV.ate:''),'Relatório de movimentações de ferramentas - CIMI',periodo(MV.de,MV.ate)+'  |  Local: '+loc,[{t:'Movimentações',head:MOVH,rows}])}
- catch(e){toast('Erro: '+(e.message||e))}}
+ baixar(tipo,'movimentacoes_'+slug(loc)+(MV.de?'_de_'+MV.de:'')+(MV.ate?'_ate_'+MV.ate:''),'Relatório de movimentações de ferramentas - CIMI',periodo(MV.de,MV.ate)+'  |  Local: '+loc,[{t:'Movimentações',head:MOVH,rows}],w)}
+ catch(e){if(w)w.close();toast('Erro: '+(e.message||e))}}
 async function verUsuario(id){const u=id?AC.find(x=>x.id===id):null,nm=u?u.nome:'Todos os usuários';
  const m=document.createElement('div');m.className='mask';m.addEventListener('click',e=>{if(e.target===m)m.remove()});
  m.innerHTML=`<div class="modal" style="max-width:920px"><h3>${u?'👤':'📋'} ${esc(nm)}</h3><div class="m">${u?esc(u.email)+' · '+esc(u.papel)+' · último acesso: '+(u.ultimo_acesso?fmt(u.ultimo_acesso):'nunca'):'Relatório geral: acessos, movimentações e edições de todos os usuários'}</div>
  <div class="bar" style="margin-top:12px;align-items:flex-end"><div><label>De</label><input type="date" id="rd1" style="width:auto"></div><div><label>Até</label><input type="date" id="rd2" style="width:auto"></div>
- <button class="btn" id="rpdf">📄 Baixar PDF</button><button class="btn o" id="rxls">📊 Baixar Excel</button></div><div id="rb"><p class="m">Carregando histórico…</p></div>
+ <button class="btn y" id="rprt">🖨️ Imprimir</button><button class="btn" id="rpdf">📄 Baixar PDF</button><button class="btn o" id="rxls">📊 Baixar Excel</button></div><div id="rb"><p class="m">Carregando histórico…</p></div>
  <div class="acts" style="margin-top:16px"><button class="btn o" onclick="this.closest('.mask').remove()">Fechar</button></div></div>`;document.body.appendChild(m);
  const f=q=>id?q.eq('usuario_id',id):q;let A,M,E,errA='';
  try{[A,M,E]=await Promise.all([fetchAll('acessos_log',f).catch(e=>{errA=e.message;return[]}),fetchAll('movimentacoes',f),fetchAll('edicoes',f)])}
@@ -167,8 +171,8 @@ async function verUsuario(id){const u=id?AC.find(x=>x.id===id):null,nm=u?u.nome:
    {t:'Edições',head:['Data e hora','Usuário','Onde','Campo','De','Para'],rows:fl(E).map(x=>[fmt(x.created_at),un(x),x.tabela+': '+x.registro,x.campo,x.valor_antigo||'-',x.valor_novo||'-'])}]};
  const show=()=>{const bl=blocos();m.querySelector('#rb').innerHTML=`<div class="cards" style="margin-top:12px">${bl.map(b=>`<div class="card"><b>${b.rows.length}</b><span>${b.t}</span></div>`).join('')}</div>`+(errA?`<p class="err">Acessos indisponíveis: ${esc(errA)}. Crie a tabela "acessos_log" no Supabase.</p>`:'')+
   bl.map(b=>`<h4 style="margin:16px 0 6px">${b.t} (${b.rows.length})</h4>${b.rows.length?`<div class="tw" style="max-height:240px"><table><tr>${b.head.map(h=>`<th>${h}</th>`).join('')}</tr>${b.rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table></div>`:'<p class="m">Nenhum registro no período.</p>'}`).join('')};
- const baixa=t=>{try{const d1=m.querySelector('#rd1').value,d2=m.querySelector('#rd2').value;baixar(t,'relatorio_'+slug(nm)+(d1?'_de_'+d1:'')+(d2?'_ate_'+d2:''),'Relatório de usuário - '+nm,periodo(d1,d2),blocos())}catch(e){toast('Erro: '+(e.message||e))}};
- m.querySelector('#rd1').onchange=m.querySelector('#rd2').onchange=show;m.querySelector('#rpdf').onclick=()=>baixa('pdf');m.querySelector('#rxls').onclick=()=>baixa('xlsx');show()}
+ const baixa=t=>{let w=null;try{if(t==='print'){w=window.open('','_blank');if(!w)return toast('O navegador bloqueou a janela de impressão. Permita pop-ups para este site.')}const d1=m.querySelector('#rd1').value,d2=m.querySelector('#rd2').value;baixar(t,'relatorio_'+slug(nm)+(d1?'_de_'+d1:'')+(d2?'_ate_'+d2:''),'Relatório de usuário - '+nm,periodo(d1,d2),blocos(),w)}catch(e){if(w)w.close();toast('Erro: '+(e.message||e))}};
+ m.querySelector('#rd1').onchange=m.querySelector('#rd2').onchange=show;m.querySelector('#rprt').onclick=()=>baixa('print');m.querySelector('#rpdf').onclick=()=>baixa('pdf');m.querySelector('#rxls').onclick=()=>baixa('xlsx');show()}
 function emailAC(id){const u=AC.find(x=>x.id===id);form(`E-mail de recuperação: ${esc(u.nome)}`,[{k:'email',l:'E-mail',t:'email',value:u.email_contato}],'Salvar',async v=>{
  await api('definir_email',{id,email:v.email});AC=null;toast('E-mail salvo ✔')})}
 
@@ -303,7 +307,7 @@ function painel(){const c=k=>D.f.filter(x=>x.status===k).length;
 function histView(){const lista=mvFiltrado(D.m);
  return`<div class="card" style="margin-bottom:12px"><div class="bar" style="align-items:flex-end;margin:0"><div><label>De</label><input type="date" value="${MV.de}" onchange="MV.de=this.value;render()" style="width:auto"></div><div><label>Até</label><input type="date" value="${MV.ate}" onchange="MV.ate=this.value;render()" style="width:auto"></div>
  <div style="flex:1;min-width:220px"><label>Local</label><select style="width:100%" onchange="MV.loc=this.value;render()">${localOpts(MV.loc,true)}</select></div>
- <button class="btn o" onclick="MV.de=MV.ate='';MV.loc='todos';render()">Limpar</button><button class="btn" onclick="relMov('pdf')">📄 Baixar PDF</button><button class="btn o" onclick="relMov('xlsx')">📊 Baixar Excel</button></div>
+ <button class="btn o" onclick="MV.de=MV.ate='';MV.loc='todos';render()">Limpar</button><button class="btn y" onclick="relMov('print')">🖨️ Imprimir</button><button class="btn" onclick="relMov('pdf')">📄 Baixar PDF</button><button class="btn o" onclick="relMov('xlsx')">📊 Baixar Excel</button></div>
  <div class="m" style="margin-top:8px">${lista.length} movimentação(ões) no filtro atual. O relatório baixado usa os mesmos filtros (data e local).</div></div><div class="tw"><table><tr><th>Quando</th><th>Tipo</th><th>Ferramenta</th><th>Saiu de</th><th>Foi para</th><th>Dias no destino</th><th>Pessoa</th><th>Foto</th><th>Registrado por</th></tr>
  ${lista.map(x=>`<tr><td>${fmt(x.created_at)}<div><button class="btn s o" title="Alterar data (pede senha)" onclick="dataMov('${x.id}')">📅 Data</button></div></td><td><span class="bd ${x.tipo}">${x.tipo}</span></td><td>${esc(F(x.ferramenta_id)?.nome)}<div class="m">${esc(F(x.ferramenta_id)?.patrimonio)}</div></td>
  ${rotaTd(x)}<td>${dias(x)}</td><td>${esc(x.pessoa)}</td><td><img class="ph" src="${x.foto_url}" onclick="foto('${x.foto_url}')"></td><td>${esc(x.usuario_nome)}</td></tr>`).join('')||'<tr><td colspan=9 class="m">Nenhuma movimentação encontrada.</td></tr>'}</table></div>`}
