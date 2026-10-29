@@ -105,6 +105,7 @@ function dataMov(id){const m=D.m.find(x=>x.id===id),d=new Date(m.created_at),loc
 let RC=null,RCerr='',RCbusy=false;
 const rcPend=()=>(RC||[]).filter(x=>x.status==='pendente');
 const rcRec=()=>(RC||[]).filter(x=>x.status==='recolhido');
+let rcTab='pend';const rcGo=t=>{rcTab=t;if(me.papel==='logistica')logView();else render()};
 async function carregaRC(){if(RCbusy)return;RCbusy=true;
  try{const {data,error}=await sb.rpc('logistica_pendentes');if(error)throw error;RC=data||[];RCerr=''}catch(e){RC=[];RCerr=e.message||String(e)}
  RCbusy=false;if(me&&me.papel==='logistica')logView();else render()}
@@ -133,7 +134,11 @@ function recolHtml(){
  return`${RCerr?`<p class="err">Não foi possível carregar os pedidos: ${esc(RCerr)}</p>`:''}
  <div class="card" style="margin-bottom:14px;background:${alerta?'#fff4e5':'#e9f7ee'};border-color:${alerta?'var(--o)':'var(--g)'};display:flex;align-items:center;gap:10px;flex-wrap:wrap">
   <strong style="font-size:18px;flex:1">${partes.length?partes.join(' · '):'✔ Nenhum pedido pendente'}</strong><button class="btn o" onclick="carregaRC()">↻ Atualizar</button></div>
- ${p.map(card).join('')}${tr.length?`<h3 style="margin:18px 0 8px">A caminho do CIMI — aguardando recebimento</h3>${tr.map(card).join('')}`:''}${ok.length?`<h3 style="margin:18px 0 8px">Recebidos no CIMI (últimos 30 dias)</h3>${ok.map(card).join('')}`:''}`}
+ <div class="acts" style="margin-bottom:14px">
+  <button class="btn ${rcTab==='pend'?'':'o'}" style="flex:1;padding:12px" onclick="rcGo('pend')">🔔 Solicitações pendentes (${p.length})</button>
+  <button class="btn ${rcTab==='rec'?'':'o'}" style="flex:1;padding:12px" onclick="rcGo('rec')">🚚 Recolhidos (${tr.length+ok.length})</button></div>
+ ${rcTab==='pend'?(p.length?p.map(card).join(''):'<p class="m">Nenhuma solicitação pendente.</p>')
+  :`${tr.length?`<h3 style="margin:4px 0 8px">${cm?'A caminho do CIMI — aguardando recebimento':'Recolhidos — levar ao CIMI'}</h3>${tr.map(card).join('')}`:''}${ok.length?`<h3 style="margin:18px 0 8px">${cm?'Recebidos no CIMI':'Entregues ao CIMI'} (últimos 30 dias)</h3>${ok.map(card).join('')}`:''}${tr.length||ok.length?'':'<p class="m">Nenhuma ferramenta recolhida ainda.</p>'}`}`}
 function logView(){const n=rcPend().length;document.title=(n?`(${n}) `:'')+'CIMI · Logística';
  $('#app').innerHTML=`<header><h1>🚚 CIMI · Logística</h1><small>${esc(me.nome)}</small><button class="btn o s" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></header><main style="max-width:720px;padding:14px">${recolHtml()}</main>`}
 function iniciaLogistica(){logView();setInterval(()=>{if(!document.hidden&&!document.querySelector('.mask'))carregaRC()},20000);
