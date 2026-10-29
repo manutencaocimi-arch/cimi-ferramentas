@@ -233,6 +233,7 @@ async function logEdit(tabela,reg,diffs){await sb.from('edicoes').insert(diffs.m
 const pessoaFields=sel=>[{k:'pid',l:'👷 Pessoa',t:'select',value:sel,opts:[['','— Selecionar pessoa cadastrada —'],...D.p.filter(p=>p.ativo||p.id===sel).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')).map(p=>[p.id,p.nome,FN(p.funcao_id)?.nome||'Sem função'])]},{k:'outro',l:'Ou digite o nome (se não estiver cadastrada)'}];
 const quem=v=>{const p=D.p.find(x=>x.id===v.pid);return{p,nome:p?.nome||v.outro}};
 const LOGG=[['fixo','Logística – fixo'],['eventual','Logística – eventual']];
+const FOTO_OBRIGATORIA=false; // true = o recebedor só confirma se enviar a foto
 const genToken=()=>{const a='abcdefghjkmnpqrstuvwxyz23456789';return Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>a[b%a.length]).join('')};
 const confUrl=t=>location.origin+location.pathname+'?c='+t;
 function shareConf(o){const url=confUrl(o.token),msg=`Olá ${o.pessoa}! A Logística (${o.logi}) entregou a ferramenta ${o.ferr} em ${o.local}. Confirme o recebimento neste link: ${url}`;
@@ -309,8 +310,8 @@ function editP(p){form(`Editar: ${esc(p.nome)}`,[...pFields(p),pwField],'Salvar 
  if(p.ativo!==at){diffs.push(['situação',p.ativo?'Ativo':'Inativo',at?'Ativo':'Inativo']);n.ativo=at}
  if(!diffs.length)return'Nada foi alterado.';const {error}=await sb.from('pessoas').update(n).eq('id',p.id);if(error)throw error;await logEdit('pessoas',p.nome,diffs);toast('Edição registrada ✔')})}
 const confBadge=x=>{if(!x.via_logistica)return'<span class="m">Retirada direta</span>';const sl=`🚚 <b>${esc(x.logistica_nome||'Logística')}</b>`;
- if(x.conf_status==='confirmada')return`${sl}<div><span class="bd disponivel">✔ Recebimento confirmado</span></div><div class="m">${esc(x.conf_nome||'')} · ${x.conf_em?fmt(x.conf_em):''}${x.conf_obs?'<br>'+esc(x.conf_obs):''}</div>`;
- if(x.conf_status==='contestada')return`${sl}<div><span class="bd baixa">⚠ Não recebeu / divergência</span></div><div class="m">${esc(x.conf_nome||'')} · ${x.conf_em?fmt(x.conf_em):''}<br>${esc(x.conf_obs||'')}</div>`;
+ if(x.conf_status==='confirmada')return`${sl}<div><span class="bd disponivel">✔ Recebimento confirmado</span></div><div class="m">${esc(x.conf_nome||'')} · ${x.conf_em?fmt(x.conf_em):''}${x.conf_obs?'<br>'+esc(x.conf_obs):''}</div>${x.conf_foto_url?`<div style="margin-top:4px"><button class="btn s o" onclick="foto('${esc(x.conf_foto_url)}')">📷 Ver foto do recebimento</button></div>`:''}`;
+ if(x.conf_status==='contestada')return`${sl}<div><span class="bd baixa">⚠ Não recebeu / divergência</span></div><div class="m">${esc(x.conf_nome||'')} · ${x.conf_em?fmt(x.conf_em):''}<br>${esc(x.conf_obs||'')}</div>${x.conf_foto_url?`<div style="margin-top:4px"><button class="btn s o" onclick="foto('${esc(x.conf_foto_url)}')">📷 Ver foto do recebimento</button></div>`:''}`;
  return`${sl}<div><span class="bd em_uso">⏳ Aguardando confirmação</span></div><div class="acts" style="margin-top:6px"><button class="btn s o" onclick="linkConf('${x.id}')">📲 Link/QR</button>${me.papel==='principal'?`<button class="btn s" onclick="confManual('${x.id}')">✔ Manual</button>`:''}</div>`};
 const pend=x=>x.via_logistica&&(x.conf_status==='pendente');
 const dup=e=>e.code==='23505'?'Já existe uma função com esse nome.':null;
@@ -395,13 +396,19 @@ async function confirmView(tk){const box=h=>{$('#app').innerHTML=`<div class="lo
  const {data:i,error}=await sb.rpc('entrega_info',{p_token:tk});
  if(error||!i)return box('<p class="err">Link inválido ou expirado. Peça um novo link à Logística ou ao CIMI.</p>');
  const det=`<div class="card" style="margin:10px 0"><div><b>🧰 ${esc(i.ferramenta)}</b> <span class="m">${esc(i.patrimonio||'')}</span></div><div>📍 ${esc(i.local||'')}</div><div>🚚 Entregue por: <b>${esc(i.logistica||'Logística')}</b></div><div class="m">${fmt(i.quando)} · destinatário: ${esc(i.pessoa)}</div></div>`;
- if(i.status!=='pendente')return box(det+`<p><span class="bd ${i.status==='confirmada'?'disponivel':'baixa'}">${i.status==='confirmada'?'✔ Recebimento confirmado':'⚠ Divergência informada'}</span></p><p class="m">${esc(i.conf_nome||'')} · ${i.conf_em?fmt(i.conf_em):''}</p>`);
- box(det+`<label>Seu nome completo</label><input id="cn" value="${esc(i.pessoa)}"><label>Observação (obrigatória se não recebeu)</label><textarea id="co" rows="2"></textarea><p class="err" id="ce"></p>
+ if(i.status!=='pendente')return box(det+`<p><span class="bd ${i.status==='confirmada'?'disponivel':'baixa'}">${i.status==='confirmada'?'✔ Recebimento confirmado':'⚠ Divergência informada'}</span></p><p class="m">${esc(i.conf_nome||'')} · ${i.conf_em?fmt(i.conf_em):''}</p>`+(i.conf_foto?`<p><img src="${esc(i.conf_foto)}" style="max-width:100%;border-radius:10px"></p>`:''));
+ box(det+`<label>Seu nome completo</label><input id="cn" value="${esc(i.pessoa)}"><label>Observação (obrigatória se não recebeu)</label><textarea id="co" rows="2"></textarea><label>📷 Foto do recebimento (a ferramenta recebida no local)</label><input type="file" id="cf" accept="image/*" capture="environment"><div id="cp" style="margin:8px 0"></div><p class="err" id="ce"></p>
  <button class="btn" style="width:100%" id="cok">✔ Confirmo que recebi esta ferramenta</button><button class="btn o" style="width:100%;margin-top:8px" id="cno">⚠ Não recebi / tem divergência</button>`);
  const env=async ac=>{const nm=$('#cn').value.trim(),ob=$('#co').value.trim();if(nm.length<3)return $('#ce').textContent='Informe seu nome completo.';if(ac==='contestar'&&!ob)return $('#ce').textContent='Explique o que houve na observação.';
-  $('#cok').disabled=$('#cno').disabled=true;const {data,error}=await sb.rpc('entrega_confirmar',{p_token:tk,p_acao:ac,p_nome:nm,p_obs:ob});
+  const fl=$('#cf').files[0];if(ac==='confirmar'&&FOTO_OBRIGATORIA&&!fl)return $('#ce').textContent='Tire a foto da ferramenta recebida para confirmar.';
+  $('#cok').disabled=$('#cno').disabled=true;$('#ce').textContent='';let fu=null;
+  if(fl){try{$('#ce').textContent='Enviando foto…';const bl=await shrink(fl),pa=`confirmacoes/${tk}/${Date.now()}.jpg`;
+   const {error:ue}=await sb.storage.from('fotos').upload(pa,bl,{contentType:'image/jpeg'});if(ue)throw ue;fu=sb.storage.from('fotos').getPublicUrl(pa).data.publicUrl;$('#ce').textContent=''}
+   catch(e){$('#cok').disabled=$('#cno').disabled=false;return $('#ce').textContent='Não foi possível enviar a foto: '+(e.message||e)}}
+  const {data,error}=await sb.rpc('entrega_confirmar',{p_token:tk,p_acao:ac,p_nome:nm,p_obs:ob,p_foto:fu});
   if(error){$('#cok').disabled=$('#cno').disabled=false;return $('#ce').textContent='Erro: '+error.message}
   box(det+(data==='ok'?`<p><span class="bd ${ac==='confirmar'?'disponivel':'baixa'}">${ac==='confirmar'?'✔ Recebimento confirmado, obrigado!':'⚠ Divergência registrada'}</span></p>`:'<p class="m">Esta entrega já havia sido respondida.</p>'))};
+ $('#cf').onchange=()=>{const f=$('#cf').files[0];$('#cp').innerHTML=f?`<img src="${URL.createObjectURL(f)}" style="max-width:100%;max-height:220px;border-radius:10px">`:''};
  $('#cok').onclick=()=>env('confirmar');$('#cno').onclick=()=>env('contestar')}
 const TK=new URLSearchParams(location.search).get('c');TK?confirmView(TK):start();
 </script></body></html>
