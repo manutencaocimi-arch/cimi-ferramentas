@@ -103,11 +103,14 @@ function dataMov(id){const m=D.m.find(x=>x.id===id),d=new Date(m.created_at),loc
   await api('alterar_data',{id,data:nd.toISOString(),senha:v.senha});toast('Data alterada ✔')})}
 // ---------- Recolhimento de material (Logística) ----------
 let RC=null,RCerr='',RCbusy=false;
+// Logística: mostra apenas este registro (os demais ficam ocultos só nesta tela; nada é apagado do banco)
+const rcManter=x=>x.status==='concluido'&&String(x.ferramenta||'').toUpperCase()==='CARRINHO DE MÃO'&&String(x.solicitante||'').trim().toLowerCase()==='davson rocha silva';
 const rcPend=()=>(RC||[]).filter(x=>x.status==='pendente');
 const rcRec=()=>(RC||[]).filter(x=>x.status==='recolhido');
 let rcTab='pend';const rcGo=t=>{rcTab=t;if(me.papel==='logistica')logView();else render()};
 async function carregaRC(){if(RCbusy)return;RCbusy=true;
  try{const {data,error}=await sb.rpc('logistica_pendentes');if(error)throw error;RC=data||[];RCerr=''}catch(e){RC=[];RCerr=e.message||String(e)}
+ if(me&&me.papel==='logistica')RC=RC.filter(rcManter);
  RCbusy=false;if(me&&me.papel==='logistica')logView();else render()}
 function recolHtml(){
  if(RC===null){carregaRC();return'<p class="m">Carregando pedidos…</p>'}
