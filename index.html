@@ -228,6 +228,34 @@ function baixar(tipo,nome,titulo,sub,blocos,w){
   doc.save(nome+'.pdf')}}
 const agTxt=s=>{s=String(s||'');return /Mobile|Android|iPhone/i.test(s)?'Celular':s?'Computador':'-'};
 const MV={de:'',ate:'',loc:'todos'};
+const MVd={de:'',ate:'',loc:'todos'};let MVsig=JSON.stringify(MV);
+const anoOk=v=>!v||(Number(v.slice(0,4))>=2000&&Number(v.slice(0,4))<=2100);
+const isoD=d=>new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+function filtrarMov(){if(!anoOk(MVd.de)||!anoOk(MVd.ate))return toast('Data inválida: confira o ano (ex.: 2026).');
+ if(MVd.de&&MVd.ate&&MVd.de>MVd.ate)return toast('A data inicial é maior que a final.');
+ MV.de=MVd.de;MV.ate=MVd.ate;MV.loc=MVd.loc;MVsig=JSON.stringify(MV);render()}
+function limparMov(){MV.de=MV.ate='';MV.loc='todos';Object.assign(MVd,MV);MVsig=JSON.stringify(MV);render()}
+function relMov(tipo){const tit={print:'🖨️ Imprimir',pdf:'📄 Baixar PDF',xlsx:'📊 Baixar Excel'}[tipo];
+ const m=document.createElement('div');m.className='mask';m.addEventListener('click',e=>{if(e.target===m)m.remove()});
+ m.innerHTML=`<div class="modal" style="max-width:460px"><h3>${tit} — escolha o período</h3>
+ <div class="bar" style="align-items:flex-end;margin:6px 0"><div><label>De</label><input type="date" id="rp1" value="${MV.de}" style="width:auto"></div><div><label>Até</label><input type="date" id="rp2" value="${MV.ate}" style="width:auto"></div></div>
+ <div class="acts" style="margin:6px 0"><button class="btn s o" data-r="hoje">Hoje</button><button class="btn s o" data-r="7">Últimos 7 dias</button><button class="btn s o" data-r="mes">Este mês</button><button class="btn s o" data-r="ant">Mês passado</button><button class="btn s o" data-r="tudo">Tudo</button></div>
+ <label>Local</label><select id="rpl" style="width:100%">${localOpts(MV.loc,true)}</select>
+ <p class="m" id="rpm" style="margin-top:8px">Deixe as datas vazias para incluir todos os registros.</p><p class="err" id="rpe"></p>
+ <div class="acts" style="margin-top:12px"><button class="btn" id="rpg">Gerar relatório</button><button class="btn o" id="rpc">Cancelar</button></div></div>`;
+ document.body.appendChild(m);
+ const q=s=>m.querySelector(s),set=(a,b)=>{q('#rp1').value=a;q('#rp2').value=b};
+ m.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{const h=new Date(),r=b.dataset.r;
+  if(r==='hoje')set(isoD(h),isoD(h));else if(r==='7'){const d=new Date(h);d.setDate(d.getDate()-6);set(isoD(d),isoD(h))}
+  else if(r==='mes')set(isoD(new Date(h.getFullYear(),h.getMonth(),1)),isoD(h));
+  else if(r==='ant')set(isoD(new Date(h.getFullYear(),h.getMonth()-1,1)),isoD(new Date(h.getFullYear(),h.getMonth(),0)));
+  else set('','')});
+ q('#rpc').onclick=()=>m.remove();
+ q('#rpg').onclick=()=>{const de=q('#rp1').value,ate=q('#rp2').value,loc=q('#rpl').value;
+  if(!anoOk(de)||!anoOk(ate))return q('#rpe').textContent='Data inválida: confira o ano (ex.: 2026).';
+  if(de&&ate&&de>ate)return q('#rpe').textContent='A data inicial é maior que a final.';
+  m.remove();relMovGo(tipo,de,ate,loc)}}
+
 const mvFiltrado=src=>{const a=dIni(MV.de),b=dFim(MV.ate);return src.filter(x=>noInt(x,a,b)&&(MV.loc==='todos'||x.local_id===MV.loc))};
 function localOpts(sel,todos){const gi=x=>{const i=GRUPOS.indexOf(x.grupo);return i<0?99:i};let h=todos?`<option value="todos">Todos os locais</option>`:'',g=null;
  [...D.l].sort((a,b)=>gi(a)-gi(b)||a.nome.localeCompare(b.nome)).filter(l=>l.tipo!=='estoque').forEach(l=>{const gr=l.grupo||'Outros';if(gr!==g){if(g!==null)h+='</optgroup>';h+=`<optgroup label="${esc(gr)}">`;g=gr}h+=`<option value="${l.id}" ${l.id===sel?'selected':''}>${esc(l.nome)}</option>`});return h+(g!==null?'</optgroup>':'')}
@@ -236,9 +264,9 @@ function movRows(src,all){const nx={},by={};all.forEach(x=>(by[x.ferramenta_id]=
  return src.map(x=>{const p=nx[x.id],fim=p?new Date(p.created_at):new Date(),n=Math.round((dd(fim)-dd(x.created_at))/864e5),[a,b]=rota(x);
   return[fmt(x.created_at),x.tipo,F(x.ferramenta_id)?.nome||'-',F(x.ferramenta_id)?.patrimonio||'',L(a)?.nome||'-',L(b)?.nome||'-',n+(p?'':' (até hoje)'),x.pessoa||'',x.via_logistica?'Logística: '+(x.logistica_nome||''):'Retirada direta',!x.via_logistica?'—':x.conf_status==='confirmada'?'Confirmada por '+(x.conf_nome||'')+' em '+(x.conf_em?fmt(x.conf_em):''):x.conf_status==='contestada'?'CONTESTADA: '+(x.conf_obs||''):'Aguardando confirmação',x.usuario_nome||'',x.obs||'']})}
 const MOVH=['Data da Retirada / Retorno','Tipo','Ferramenta','Patrimônio','Saiu de','Foi para','Dias no destino','Pessoa','Entrega','Confirmação do recebimento','Registrado por','Observação'];
-async function relMov(tipo){let w=null;try{if(tipo==='print'){w=window.open('','_blank');if(!w)return toast('O navegador bloqueou a janela de impressão. Permita pop-ups para este site.')}toast('Gerando relatório…');const all=await fetchAll('movimentacoes');
- const rows=movRows(mvFiltrado(all),all),loc=MV.loc==='todos'?'Todos os locais':L(MV.loc)?.nome||'';
- baixar(tipo,'movimentacoes_'+slug(loc)+(MV.de?'_de_'+MV.de:'')+(MV.ate?'_ate_'+MV.ate:''),'Relatório de movimentações de ferramentas - CIMI',periodo(MV.de,MV.ate)+'  |  Local: '+loc,[{t:'Movimentações',head:MOVH,rows}],w)}
+async function relMovGo(tipo,de,ate,locId){let w=null;try{if(tipo==='print'){w=window.open('','_blank');if(!w)return toast('O navegador bloqueou a janela de impressão. Permita pop-ups para este site.')}toast('Gerando relatório…');const all=await fetchAll('movimentacoes');
+ const a_=dIni(de),b_=dFim(ate),rows=movRows(all.filter(x=>noInt(x,a_,b_)&&(locId==='todos'||x.local_id===locId)),all),loc=locId==='todos'?'Todos os locais':L(locId)?.nome||'';
+ baixar(tipo,'movimentacoes_'+slug(loc)+(de?'_de_'+de:'')+(ate?'_ate_'+ate:''),'Relatório de movimentações de ferramentas - CIMI',periodo(de,ate)+'  |  Local: '+loc,[{t:'Movimentações',head:MOVH,rows}],w)}
  catch(e){if(w)w.close();toast('Erro: '+(e.message||e))}}
 async function verUsuario(id){const u=id?AC.find(x=>x.id===id):null,nm=u?u.nome:'Todos os usuários';
  const m=document.createElement('div');m.className='mask';m.addEventListener('click',e=>{if(e.target===m)m.remove()});
@@ -465,11 +493,11 @@ function movDet(id){const x=D.m.find(y=>String(y.id)===String(id));if(!x)return;
  <div class="m" style="margin-bottom:8px">Todo o caminho da ferramenta neste ciclo: quem passou, quando e todas as fotos.${ini?` · Dias no destino: ${dias(ini)}`:''}</div>
  ${ev.map(e=>`<div class="tl" style="border-left-color:${e.cor}"><div><span style="font-size:18px">${e.ic}</span> <b>${e.t}</b></div>${e.q?`<div class="m">${fmt(e.q)}</div>`:''}${e.linhas.map(l=>`<div>${l}</div>`).join('')}${e.fotos.length?`<div class="acts" style="margin-top:6px">${e.fotos.map(f=>`<div style="text-align:center"><img class="ph" style="width:96px;height:96px" src="${esc(f.u)}" onclick="foto('${esc(f.u)}')"><div class="m" style="max-width:96px">${esc(f.l)}</div></div>`).join('')}</div>`:''}</div>`).join('')||'<p class="m">Sem dados.</p>'}
  <button class="btn o" onclick="this.closest('.mask').remove()">Fechar</button></div>`;document.body.appendChild(m)}
-function histView(){const lista=mvFiltrado(D.m);
- return`<div class="card" style="margin-bottom:12px"><div class="bar" style="align-items:flex-end;margin:0"><div><label>De</label><input type="date" value="${MV.de}" onchange="MV.de=this.value;render()" style="width:auto"></div><div><label>Até</label><input type="date" value="${MV.ate}" onchange="MV.ate=this.value;render()" style="width:auto"></div>
- <div style="flex:1;min-width:220px"><label>Local</label><select style="width:100%" onchange="MV.loc=this.value;render()">${localOpts(MV.loc,true)}</select></div>
- <button class="btn o" onclick="MV.de=MV.ate='';MV.loc='todos';render()">Limpar</button><button class="btn y" onclick="relMov('print')">🖨️ Imprimir</button><button class="btn" onclick="relMov('pdf')">📄 Baixar PDF</button><button class="btn o" onclick="relMov('xlsx')">📊 Baixar Excel</button></div>
- <div class="m" style="margin-top:8px">${lista.length} movimentação(ões) no filtro atual.${lista.filter(pend).length?` · <b style="color:var(--o)">⏳ ${lista.filter(pend).length} entrega(s) da Logística aguardando confirmação</b>`:''} O relatório baixado usa os mesmos filtros (data e local).</div></div><div class="tw"><table><tr><th>Data da Retirada / Retorno</th><th>Tipo</th><th>Ferramenta</th><th>Saiu de</th><th>Foi para</th><th>Dias no destino</th><th>Pessoa</th><th>Entrega / Confirmação</th><th>Foto</th><th>Registrado por</th><th>Percurso</th></tr>
+function histView(){if(MVsig!==JSON.stringify(MV)){Object.assign(MVd,MV);MVsig=JSON.stringify(MV)}const lista=mvFiltrado(D.m),alt=JSON.stringify(MVd)!==JSON.stringify(MV);
+ return`<div class="card" style="margin-bottom:12px"><div class="bar" style="align-items:flex-end;margin:0"><div><label>De</label><input type="date" value="${MVd.de}" onchange="MVd.de=this.value" style="width:auto"></div><div><label>Até</label><input type="date" value="${MVd.ate}" onchange="MVd.ate=this.value" style="width:auto"></div>
+ <div style="flex:1;min-width:220px"><label>Local</label><select style="width:100%" onchange="MVd.loc=this.value">${localOpts(MVd.loc,true)}</select></div>
+ <button class="btn" onclick="filtrarMov()">🔍 Filtrar</button><button class="btn o" onclick="limparMov()">Limpar</button><button class="btn y" onclick="relMov('print')">🖨️ Imprimir</button><button class="btn" onclick="relMov('pdf')">📄 Baixar PDF</button><button class="btn o" onclick="relMov('xlsx')">📊 Baixar Excel</button></div>
+ <div class="m" style="margin-top:8px">${lista.length} movimentação(ões) no filtro atual.${lista.filter(pend).length?` · <b style="color:var(--o)">⏳ ${lista.filter(pend).length} entrega(s) da Logística aguardando confirmação</b>`:''}${alt?' · <b style="color:var(--o)">Filtro alterado: clique em 🔍 Filtrar</b>':''} Ao imprimir ou baixar, uma caixa pergunta o período.</div></div><div class="tw"><table><tr><th>Data da Retirada / Retorno</th><th>Tipo</th><th>Ferramenta</th><th>Saiu de</th><th>Foi para</th><th>Dias no destino</th><th>Pessoa</th><th>Entrega / Confirmação</th><th>Foto</th><th>Registrado por</th><th>Percurso</th></tr>
  ${lista.map(x=>`<tr><td><div class="m" style="font-weight:700;margin-bottom:2px">${x.tipo==='retirada'?'Data da Retirada':'Data de Retorno'}</div>${fmt(x.created_at)}<div><button class="btn s o" title="Alterar data (pede senha)" onclick="dataMov('${x.id}')">📅 Data</button></div></td><td><span class="bd ${x.tipo}">${x.tipo}</span></td><td>${esc(F(x.ferramenta_id)?.nome)}<div class="m">${esc(F(x.ferramenta_id)?.patrimonio)}</div></td>
  ${rotaTd(x)}<td>${dias(x)}</td><td>${esc(x.pessoa)}</td><td>${confBadge(x)}${recBadge(x)}</td><td><img class="ph" src="${x.foto_url}" onclick="foto('${x.foto_url}')"></td><td>${esc(x.usuario_nome)}</td><td><button class="btn s" onclick="movDet('${x.id}')">🔎 Detalhes</button></td></tr>`).join('')||'<tr><td colspan=11 class="m">Nenhuma movimentação encontrada.</td></tr>'}</table></div>`}
 const GV={[GR_CIMI]:['🏠','#2e9e4f'],'Estações BRT Norte Sul':['🚏','#2b6cb0'],'Estações BRT Leste Oeste':['🚏','#7b4fc4'],'Terminais Estações BRT Leste - Oeste':['🚌','#0f8f8f'],'Terminais Estações BRT Norte - Sul':['🚌','#c2410c'],'Terminais Primitivos':['🏛️','#8a6d3b'],"PA'S":['🏢','#d6457a'],'Sem grupo':['📍','#6b7a71']};
