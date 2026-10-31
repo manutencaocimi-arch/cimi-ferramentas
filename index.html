@@ -62,7 +62,7 @@ const SUPABASE_URL='https://qviqhcntabtuyisdhdqo.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2aXFoY250YWJ0dXlpc2RoZHFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMTA3NDUsImV4cCI6MjEwODc4Njc0NX0.d86r1LH9dKXg6q9geSD-xJ2IEDPSZAlzsSR8F2EJ7bk';
 // ==================================================================
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-let me=null,D={f:[],l:[],m:[],e:[],p:[],fn:[],rc:[]},tab='painel',q='',flt='todos';
+let me=null,D={f:[],l:[],m:[],mT:[],e:[],p:[],fn:[],rc:[]},tab='painel',q='',flt='todos';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=d=>new Date(d).toLocaleString('pt-BR');
@@ -218,7 +218,12 @@ const entRec=id=>ent((RC||[]).find(y=>y.id===id));
 // Cenário 1: destino CIMI · Cenário 2: destino alternativo autorizado (ent = autorizado e ainda não entregue; altDest = autorizado ou já entregue) · Em análise: sol
 const altDest=x=>!!(x&&x.dv&&(['aprovado','concluido'].includes(x.dv.destino_status)||x.dv.entregue_em));
 const solDest=x=>!!(x&&x.dv&&x.dv.destino_status==='solicitado');
-const altRec=id=>altDest((RC||[]).find(y=>y.id===id)),solRec=id=>solDest((RC||[]).find(y=>y.id===id));
+// Trâmite de mudança de destino: tudo fica na 1ª movimentação. O registro técnico da entrega (guarda o link/QR e a confirmação) não é movimentação própria.
+const carDe=r=>{const t=r.destino_mov_token;return(D.mT||[]).find(c=>String(c.recolhimento_id)===String(r.id)||(t&&c.token_confirmacao===t))};
+const dvDe=r=>{if(!r||!r.destino_status)return null;const c=carDe(r)||{},lo=(D.l||[]).find(l=>String(l.id)===String(r.destino_local_id));
+ return{destino_status:r.destino_status,local:lo?lo.nome:'',para:r.destino_para,motivo:r.destino_motivo,solic_em:r.destino_solic_em,solic_por:r.destino_solic_por,decisao_em:r.destino_decisao_em,decisao_por:r.destino_decisao_por,decisao_obs:r.destino_decisao_obs,entregue_em:r.destino_entregue_em,entregue_por:r.destino_entregue_por,receptor:r.destino_receptor,obs:r.destino_obs,foto:r.destino_foto,token:r.destino_mov_token,conf_status:c.conf_status,conf_em:c.conf_em,conf_nome:c.conf_nome,conf_obs:c.conf_obs}};
+const rcDv=id=>{const x=(RC||[]).find(y=>y.id===id);if(x&&x.dv)return x;const r=(D.rc||[]).find(y=>y.id===id);return r?{dv:dvDe(r)}:x};
+const altRec=id=>altDest(rcDv(id)),solRec=id=>solDest(rcDv(id));
 const rcPend=()=>(RC||[]).filter(x=>x.status==='pendente'&&!rcHid(x));
 const rcRec=()=>(RC||[]).filter(x=>x.status==='recolhido'&&!rcHid(x));
 let rcTab='pend';const rcGo=t=>{rcTab=t;if(me.papel==='logistica')logView();else render()};
@@ -342,7 +347,8 @@ function resetSenha(id){const u=AC.find(x=>x.id===id);if(!u||u.papel==='principa
   alert(`Senha de ${loginDe(u)} resetada.\n\nSenha inicial: ${SENHA_INICIAL}\n\nNo próximo acesso o sistema pedirá que ela cadastre uma nova senha.${r.aviso?'\n\n⚠️ '+r.aviso:''}`)})}
 function verSenha(id){const u=AC.find(x=>x.id===id);alert(`Senha provisória de ${loginDe(u)}:\n\n${u.senha_provisoria}`)}
 // ---------- Relatórios (PDF / Excel) ----------
-async function fetchAll(t,fn){let out=[],i=0;for(;;){let q=sb.from(t).select('*').order('created_at',{ascending:false}).range(i,i+999);if(fn)q=fn(q);const {data,error}=await q;if(error)throw error;out=out.concat(data||[]);if(!data||data.length<1000)break;i+=1000}return out}
+const ehTrR=x=>x.tipo==='retirada'&&(x.recolhimento_id||/^(Transferência urgente|Trâmite da 1ª)/.test(x.obs||''));
+async function fetchAll(t,fn){let out=[],i=0;for(;;){let q=sb.from(t).select('*').order('created_at',{ascending:false}).range(i,i+999);if(fn)q=fn(q);const {data,error}=await q;if(error)throw error;out=out.concat(data||[]);if(!data||data.length<1000)break;i+=1000}return t==='movimentacoes'?out.filter(x=>!ehTrR(x)):out}
 const dIni=s=>s?new Date(s+'T00:00:00'):null,dFim=s=>s?new Date(s+'T23:59:59.999'):null;
 const noInt=(x,a,b)=>{const t=new Date(x.created_at);return(!a||t>=a)&&(!b||t<=b)};
 const br=s=>s?s.split('-').reverse().join('/'):'';
@@ -562,7 +568,8 @@ async function start(){
 async function load(){
  const [f,l,m,e,pe,fu,rc,cg]=await Promise.all([sb.from('ferramentas').select('*').order('nome'),sb.from('locais').select('*').order('nome'),
   sb.from('movimentacoes').select('*').order('created_at',{ascending:false}).limit(500),sb.from('edicoes').select('*').order('created_at',{ascending:false}).limit(300),sb.from('pessoas').select('*').order('nome'),sb.from('funcoes').select('*').order('nome'),sb.from('recolhimentos').select('*').order('created_at',{ascending:false}).limit(500),sb.from('cargos').select('*')]);
- D={f:f.data||[],l:l.data||[],m:m.data||[],e:e.data||[],p:pe.data||[],fn:fu.data||[],rc:rc.data||[]};CG=Object.fromEntries((cg.data||[]).map(r=>[r.user_id,r]))}
+ const mAll=m.data||[],ehTr=x=>x.tipo==='retirada'&&(x.recolhimento_id||/^(Transferência urgente|Trâmite da 1ª)/.test(x.obs||''));
+ D={f:f.data||[],l:l.data||[],m:mAll.filter(x=>!ehTr(x)),mT:mAll.filter(ehTr),e:e.data||[],p:pe.data||[],fn:fu.data||[],rc:rc.data||[]};CG=Object.fromEntries((cg.data||[]).map(r=>[r.user_id,r]))}
 
 // ---------- Modal / formulário genérico ----------
 function form(title,fields,okLabel,onSubmit){
@@ -719,7 +726,7 @@ function painel(){const c=k=>D.f.filter(x=>x.status===k).length;
  <button class="btn s o" onclick="act(hist,'${f.id}',D.f)">Histórico</button><button class="btn s o" onclick="act(editF,'${f.id}',D.f)">✏️</button></td></tr>`).join('')||'<tr><td colspan=6 class="m">Nenhuma ferramenta encontrada.</td></tr>'}</table></div>`}
 const recsDe=x=>x.tipo==='retirada'?(D.rc||[]).filter(r=>String(r.mov_id)===String(x.id)&&r.status!=='cancelado'):x.recolhimento_id?(D.rc||[]).filter(r=>r.id===x.recolhimento_id):[];
 const recBadge=x=>{const r=recsDe(x).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0];if(!r)return'';
- const t=r.status==='pendente'?['em_uso',altRec(r.id)?'🚚 Entrega autorizada — aguardando a Logística retirar e entregar':solRec(r.id)?'🔀 Destino aguardando aprovação':'🔔 Recolhimento solicitado — aguardando a Logística']:r.status==='recolhido'?['em_uso',altRec(r.id)?'🚚 Retirado pela Logística — a caminho do destino autorizado':solRec(r.id)?'⏳ Retirado — aguardando aprovação do destino':'🚚 Recolhido pela Logística — aguardando o CIMI receber']:['disponivel',altRec(r.id)?'✔ Entregue no destino autorizado':'✔ Recolhimento concluído no CIMI'];
+ const t=r.status==='pendente'?['em_uso',altRec(r.id)?'🚚 Entrega autorizada — aguardando a Logística retirar e entregar':solRec(r.id)?'🔀 Destino aguardando aprovação':'🔔 Recolhimento solicitado — aguardando a Logística']:r.status==='recolhido'?['em_uso',altRec(r.id)?'🚚 Retirado pela Logística — a caminho do destino autorizado':solRec(r.id)?'⏳ Retirado — aguardando aprovação do destino':'🚚 Recolhido pela Logística — aguardando o CIMI receber']:(altRec(r.id)?(()=>{const dv=rcDv(r.id).dv||{};return dv.conf_status==='confirmada'?['disponivel','✔ Entregue no destino autorizado — recebimento confirmado por '+(dv.conf_nome||dv.receptor||'destinatário')]:dv.conf_status==='contestada'?['baixa','⚠ Entregue no destino — divergência informada']:['em_uso','⏳ Entregue no destino autorizado ('+(dv.local||'—')+') — aguardando confirmação de '+(dv.receptor||'recebimento')]})():['disponivel','✔ Recolhimento concluído no CIMI']);
  return`<div style="margin-top:6px"><span class="bd ${t[0]}" style="white-space:normal;display:inline-block">${t[1]}</span></div>`};
 function movDet(id){const x=D.m.find(y=>String(y.id)===String(id));if(!x)return;const fer=F(x.ferramenta_id)||{};
  const ms=D.m.filter(y=>y.ferramenta_id===x.ferramenta_id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
@@ -736,7 +743,7 @@ function movDet(id){const x=D.m.find(y=>String(y.id)===String(id));if(!x)return;
    if(cs==='confirmada'||cs==='contestada')E(cs==='confirmada'?'✔':'⚠',cs==='confirmada'?'Recebimento confirmado no local':'Divergência informada no recebimento',ini.conf_em,[`Por: <b>${esc(ini.conf_nome||'—')}</b>`,ob(ini.conf_obs)],[ph(ini.conf_foto_url,'Foto do recebimento')],cs==='confirmada'?'var(--g)':'var(--r)');
    else E('⏳','Aguardando confirmação do recebimento no local',null,[],[],'var(--o)')}
   rs=(D.rc||[]).filter(r=>String(r.mov_id)===String(ini.id)&&r.status!=='cancelado').sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
-  rs.forEach(r=>{const rcx=(RC||[]).find(y=>y.id===r.id)||{},dv=rcx.dv,ea=altDest(rcx);
+  rs.forEach(r=>{const rcx=(RC||[]).find(y=>y.id===r.id)||{},dv=dvDe(r)||rcx.dv,ea=altDest({dv});
    E('🔔','Pedido de recolhimento',r.created_at,[`Solicitado por: <b>${esc(r.solicitante||'—')}</b>${r.origem==='link'?' (pelo link)':''}`,ob(r.obs)],[ph(r.foto_pedido_url,'Foto do local / material a recolher')],'var(--o)');
     if(dv&&dv.solic_em){E('🔀','Mudança de destino solicitada',dv.solic_em,[`Levar para: <b>${esc(dv.local||'—')}</b> · para <b>${esc(dv.para||'—')}</b> (em vez do CIMI)`,`Solicitada por: <b>${esc(dv.solic_por||'—')}</b>`,ob(dv.motivo)],[],'var(--o)');
      if(dv.destino_status==='solicitado')E('⏳','Mudança de destino aguardando aprovação',null,[],[],'var(--o)');
@@ -745,8 +752,9 @@ function movDet(id){const x=D.m.find(y=>String(y.id)===String(id));if(!x)return;
    if(r.status!=='pendente')E('🚚',ea?'Retirado pela Logística':'Recolhido pela Logística',r.recolhido_em,[`Por: <b>${esc(r.recolhido_por_nome||'—')}</b> → ${ea?'a caminho de <b>'+esc(dv.local||'—')+'</b>':'levado ao CIMI'}`],[ph(r.foto_url,ea?'Foto da retirada no local':'Foto do recolhimento')],'var(--bl)');
    if(r.status==='recolhido')E('⏳',ea?'Aguardando a entrega no destino':'Aguardando recebimento no CIMI',null,[],[],'var(--bl)');
    if(r.status==='concluido'&&dv&&dv.entregue_em){E('📍','Entregue no destino autorizado',dv.entregue_em,[`Local: <b>${esc(dv.local||'—')}</b>`,`Levado por: <b>${esc(dv.entregue_por||'—')}</b> · recebido por <b>${esc(dv.receptor||'—')}</b>`,ob(dv.obs)],[ph(dv.foto,'Foto da entrega')],'var(--g)');
+     if(dv.conf_status==='pendente')E('⏳','Aguardando confirmação de recebimento de '+esc(dv.receptor||'—'),null,[],[],'var(--o)');
      if(dv.conf_status==='confirmada'||dv.conf_status==='contestada'){const cf=dv.conf_status==='confirmada';E(cf?'✔':'⚠',cf?'Recebimento confirmado pelo destinatário':'Divergência informada pelo destinatário',dv.conf_em,[`Por: <b>${esc(dv.conf_nome||'—')}</b>`,ob(dv.conf_obs)],[],cf?'var(--g)':'var(--r)')}}
-    else if(r.status==='concluido')E('📥','Recebido no CIMI — baixa dada',r.recebido_em,[`Por: <b>${esc(r.recebido_por_nome||'—')}</b>`,ob(r.recebido_obs)],[ph(r.recebido_foto_url,'Foto do recebimento no CIMI')],'var(--g)')})}
+    else if(r.status==='concluido'&&r.recebido_em)E('📥','Recebido no CIMI — baixa dada',r.recebido_em,[`Por: <b>${esc(r.recebido_por_nome||'—')}</b>`,ob(r.recebido_obs)],[ph(r.recebido_foto_url,'Foto do recebimento no CIMI')],'var(--g)')})}
  const fimRec=fim&&fim.recolhimento_id&&rs.some(r=>r.id===fim.recolhimento_id);
  if(fim&&!fimRec)E('↩','Devolução ao CIMI',fim.created_at,[`Entregue por: <b>${esc(fim.pessoa)}</b>`,`Registrado por: ${esc(fim.usuario_nome)}`,ob(fim.obs)],[ph(fim.foto_url,'Foto da devolução')],'var(--g)');
  if(!fim&&fer.status==='em_uso')E('🧰','Ainda em uso',null,[`Com: <b>${esc(fer.responsavel_atual||'—')}</b> · ${esc(L(fer.local_atual_id)?.nome||'—')}`],[],'var(--o)');
