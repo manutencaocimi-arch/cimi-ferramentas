@@ -64,6 +64,11 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 let me=null,D={f:[],l:[],m:[],mT:[],e:[],p:[],fn:[],rc:[]},tab='painel',q='',flt='todos';
 const $=s=>document.querySelector(s);
+let saindo=false;
+async function sair(){saindo=true;
+ try{await Promise.race([sb.auth.signOut(),new Promise(r=>setTimeout(r,2500))])}catch(e){}
+ try{[localStorage,sessionStorage].forEach(st=>Object.keys(st).filter(k=>k.startsWith('sb-')).forEach(k=>st.removeItem(k)))}catch(e){}
+ location.reload()}
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=d=>new Date(d).toLocaleString('pt-BR');
 const ST={disponivel:'Disponível (CIMI)',em_uso:'Em uso',baixa:'Baixa'};
@@ -85,7 +90,7 @@ async function api(action,body={}){const {data:{session}}=await sb.auth.getSessi
 function trocarView(msg=''){$('#app').innerHTML=`<div class="login"><h2>🔒 Defina sua nova senha</h2><p class="m">Por segurança, troque a senha provisória antes de continuar.</p>
 <label for="n1">Nova senha (mín. 6 caracteres)</label><input id="n1" type="password" autocomplete="new-password">
 <label for="n2">Repita a nova senha</label><input id="n2" type="password" autocomplete="new-password"><p class="err">${esc(msg)}</p>
-<button class="btn" style="width:100%" id="sv">Salvar e entrar</button><button class="btn o" style="width:100%;margin-top:8px" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></div>`;
+<button class="btn" style="width:100%" id="sv">Salvar e entrar</button><button class="btn o" style="width:100%;margin-top:8px" onclick="sair()">Sair</button></div>`;
  $('#sv').onclick=async()=>{const a=$('#n1').value,b=$('#n2').value;if(a.length<6)return trocarView('Use ao menos 6 caracteres.');if(a!==b)return trocarView('As senhas não conferem.');
   const {error}=await sb.auth.updateUser({password:a});if(error)return trocarView(error.message);
   await api('senha_trocada').catch(()=>{});await sb.from('profiles').update({trocar_senha:false}).eq('id',me.id);start()}}
@@ -229,7 +234,7 @@ const altRec=id=>altDest(rcDv(id)),solRec=id=>solDest(rcDv(id));
 const rcPend=()=>(RC||[]).filter(x=>x.status==='pendente'&&!rcHid(x));
 const rcRec=()=>(RC||[]).filter(x=>x.status==='recolhido'&&!rcHid(x));
 let rcTab='pend';const rcGo=t=>{rcTab=t;if(me.papel==='logistica')logView();else render()};
-async function carregaRC(){if(RCbusy)return;RCbusy=true;
+async function carregaRC(){if(RCbusy||saindo)return;RCbusy=true;
  try{const {data,error}=await sb.rpc('logistica_pendentes');if(error)throw error;RC=data||[];RCerr='';try{const {data:dv}=await sb.rpc('logistica_desvios');const mp=Object.fromEntries((dv||[]).map(d=>[d.id,d]));RC=RC.map(x=>({...x,dv:dvMescla(dvPend(x),mp[x.id])}))}catch(_){RC=RC.map(x=>({...x,dv:dvPend(x)}))}}catch(e){RC=[];RCerr=e.message||String(e)}
   RCbusy=false;if(me&&me.papel==='logistica')logView();else render()}
 function recolHtml(){
@@ -276,7 +281,7 @@ function recolHtml(){
  ${rcTab==='and'?andHtml():rcTab==='pend'?(p.length?`${pE.length?`<h3 style="margin:4px 0 8px">🚚 Entregas autorizadas — retirar e entregar</h3>${pE.map(card).join('')}`:''}${pC.length?`${pE.length?'<h3 style="margin:18px 0 8px">🔔 Recolher para o CIMI</h3>':''}${pC.map(card).join('')}`:''}${pS.length?`<h3 style="margin:18px 0 8px">🔀 Destino aguardando aprovação</h3>${pS.map(card).join('')}`:''}`:'<p class="m">Nenhuma solicitação pendente.</p>')
   :`${trE.length?`<h3 style="margin:4px 0 8px">🚚 ${cm?'A caminho do destino autorizado':'Retirados — levar e entregar no destino'}</h3>${trE.map(card).join('')}`:''}${trC.length?`<h3 style="margin:${trE.length?18:4}px 0 8px">${cm?'A caminho do CIMI — aguardando recebimento':'Recolhidos — levar ao CIMI'}</h3>${trC.map(card).join('')}`:''}${trS.length?`<h3 style="margin:18px 0 8px">🔀 Retirados — destino aguardando aprovação</h3>${trS.map(card).join('')}`:''}${okC.length?`<h3 style="margin:18px 0 8px">${cm?'Recebidos no CIMI':'Entregues ao CIMI'} (últimos 30 dias)</h3>${okC.map(card).join('')}`:''}${okE.length?`<h3 style="margin:18px 0 8px">📍 Entregues nos destinos autorizados (últimos 30 dias)</h3>${okE.map(card).join('')}`:''}${tr.length||ok.length?'':'<p class="m">Nenhuma ferramenta recolhida ainda.</p>'}`}`}
 function logView(){const n=rcPend().length;document.title=(n?`(${n}) `:'')+'CIMI · Logística';
- $('#app').innerHTML=`<header><h1>🚚 CIMI · Logística</h1><small>${esc(me.nome)}</small><button class="btn o s" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></header><main style="max-width:720px;padding:14px">${recolHtml()}</main>`}
+ $('#app').innerHTML=`<header><h1>🚚 CIMI · Logística</h1><small>${esc(me.nome)}</small><button class="btn o s" onclick="sair()">Sair</button></header><main style="max-width:720px;padding:14px">${recolHtml()}</main>`}
 function iniciaLogistica(){logView();setInterval(()=>{if(!document.hidden&&!document.querySelector('.mask'))carregaRC()},20000);
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)carregaRC()})}
 function recolher(id){const x=RC.find(r=>r.id===id);if(!x)return;const ea=ent(x);const m=document.createElement('div');m.className='mask';
@@ -495,7 +500,7 @@ function exHtml(){if(EX===null){carregaEX();return'<p class="m">Carregando…</p
   <div style="font-size:18px;font-weight:800;margin:4px 0">${esc(r.ferramenta)} <span class="m">${esc(r.patrimonio||'')}</span></div>${r.avulso?`<div><span class="pill u">📦 Material avulso</span>${r.local?` <span class="m">📍 ${esc(r.local)}</span>`:''}</div>`:''}<div class="m">Pedido em ${fmt(r.quando)}</div>${r.obs?`<div style="margin-top:6px">💬 ${esc(r.obs)}</div>`:''}
   ${r.recolhido_por?`<div class="m" style="margin-top:6px">🚚 Recolhido por ${esc(r.recolhido_por)}${r.recolhido_em?' · '+fmt(r.recolhido_em):''}</div>`:''}${r.recebido_em?`<div class="m">📥 Recebido no CIMI · ${fmt(r.recebido_em)}</div>`:''}</div>`).join('')||'<p class="m">Você ainda não fez nenhum pedido de retirada (nos últimos 30 dias).</p>'}`}
 function exView(){const n=exPend().length;document.title=(n?`(${n}) `:'')+'CIMI · Minhas ferramentas';
- $('#app').innerHTML=`<header><h1>🛠️ CIMI · Minhas ferramentas</h1><small>${esc(me.nome)}</small><button class="btn o s" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></header><main style="max-width:720px;padding:14px">${exHtml()}</main>`}
+ $('#app').innerHTML=`<header><h1>🛠️ CIMI · Minhas ferramentas</h1><small>${esc(me.nome)}</small><button class="btn o s" onclick="sair()">Sair</button></header><main style="max-width:720px;padding:14px">${exHtml()}</main>`}
 function iniciaExecutor(){exView();carregaEX();setInterval(()=>{if(!document.hidden&&!document.querySelector('.mask'))carregaEX()},20000);
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)carregaEX()})}
 async function exUp(file){const bl=await shrink(file),pa=`executor/${me.id}/${Date.now()}.jpg`;
@@ -706,7 +711,7 @@ const act=(fn,id,arr)=>fn(arr.find(x=>x.id===id));
 // ---------- Telas ----------
 function render(){
  const tabs=[['painel','🧰 Ferramentas'],['hist','🕘 Movimentações'],['locais','📍 Locais'],['pessoas','👷 Pessoas'],['funcoes','🏷️ Funções'],['edic','✏️ Edições']];{const nr=rcPend().length+rcRec().length;tabs.push(['recol','🚚 Recolhimentos'+(nr?' <span class="pill u">'+nr+'</span>':'')]);const na=aprPend().length;tabs.push(['aprov','🔀 Aprovações'+(na?' <span class="pill u">'+na+'</span>':'')])}if(me.papel==='principal')tabs.push(['acessos','🔑 Acessos']);
- $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas</h1><small>${esc(me.nome)} (${meCargo()||(me.papel==='principal'?'principal':'correlato')})</small><button class="btn o s" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></header>
+ $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas</h1><small>${esc(me.nome)} (${meCargo()||(me.papel==='principal'?'principal':'correlato')})</small><button class="btn o s" onclick="sair()">Sair</button></header>
  <nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';q='';render()">${t[1]}</button>`).join('')}</nav><main>${{painel,hist:histView,locais,pessoas,funcoes,edic,acessos,recol:recolHtml,aprov:aprovView}[tab]()}</main>`;
  const s=$('#q');if(s){s.oninput=e=>{q=e.target.value;const p=e.target.selectionStart;render();const n=$('#q');n.focus();n.setSelectionRange(p,p)}}}
 const recAtiva=fid=>(D.rc||[]).find(r=>r.ferramenta_id===fid&&(r.status==='pendente'||r.status==='recolhido'));
