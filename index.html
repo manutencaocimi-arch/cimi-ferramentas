@@ -108,7 +108,9 @@ let RC=null,RCerr='',RCbusy=false;
 let CG={};
 const meCargo=()=>CG[me.id]?.cargo||'';
 const podeAprovar=()=>me.papel==='principal'||['ADM','Coordenador','Supervisor'].includes(meCargo());
-const cargoTag=u=>CG[u.id]?`<span class="pill u">${esc(CG[u.id].cargo)}</span>`:'—';
+const cargoTag=u=>{const c=CG[u.id];if(c)return`<span class="pill u">${esc(c.cargo)}</span>`;
+ const nm=x=>String(x||'').trim().toLowerCase(),pe=(D.p||[]).find(x=>x.usuario_id===u.id)||(D.p||[]).find(x=>nm(x.nome)&&nm(x.nome)===nm(u.nome));
+ const f=pe&&FN(pe.funcao_id)?.nome;return f?`<span class="pill u">${esc(f)}</span>`:'—'};
 const CARGOS=['ADM','Coordenador','Supervisor','Assistente/Encarregado','Jovem Aprendiz'];
 function cargoAC(id){const u=AC.find(x=>x.id===id);if(!u)return;
  form(`Cargo: ${esc(loginDe(u))}`,[{k:'cargo',l:'Cargo (ADM, Coordenador e Supervisor aprovam mudança de destino)',t:'select',value:CG[id]?.cargo||'',opts:[['','— Sem cargo —'],...CARGOS.map(c=>[c,c])]},
