@@ -121,17 +121,17 @@ function cargoAC(id){const u=AC.find(x=>x.id===id);if(!u)return;
   await logEdit('acessos',loginDe(u),[['cargo',CG[id]?.cargo||'—',v.cargo||'—']]);await load();AC=null;toast('Cargo atualizado ✔')})}
 const dvBox=(h,cor='var(--o)',bg='#fff4e5')=>`<div style="margin-top:10px;padding:10px;border-radius:8px;background:${bg};border:1px solid ${cor}">${h}</div>`;
 function cardDv(h,x,cm){const dv=x.dv,pode=['logistica','principal'].includes(me.papel),ativo=['pendente','recolhido'].includes(x.status);let b='';
- if(dv&&dv.destino_status==='aprovado'&&x.status!=='concluido'){
-  h=h.replace(/<button class="btn"[^>]*cimiReceber\('[^']*'\)">[^<]*<\/button>/,'').replace('LEVAR AO CIMI (o CIMI confirma o recebimento)','LEVAR AO DESTINO AUTORIZADO').replace('AGUARDANDO RECEBIMENTO NO CIMI','DESTINO ALTERNATIVO AUTORIZADO').replace(/⏳ Entregue o material no CIMI\. A baixa só é dada quando o CIMI confirmar o recebimento\./,'⏳ Leve o material ao destino autorizado e envie a foto da entrega.')}
- if(dv&&dv.destino_status==='concluido'||x.status==='concluido'&&dv&&dv.entregue_em){
-  h=h.replace('✔ RECEBIDO NO CIMI','✔ ENTREGUE NO DESTINO AUTORIZADO').replace(/<div class="m" style="margin-top:8px">📥 Recebido no CIMI por [\s\S]*?<\/div>/,'')}
+
+
+
+
  if(dv&&dv.destino_status==='solicitado'){
-  b=dvBox(`<div style="font-weight:700">🔀 Mudança de destino — aguardando aprovação</div><div>📍 Levar para: <strong>${esc(dv.local||'—')}</strong></div><div>👷 Para: <strong>${esc(dv.para||'—')}</strong></div><div class="m">Pedido por ${esc(dv.solic_por||'—')} · ${dv.solic_em?fmt(dv.solic_em):''}</div><div>💬 ${esc(dv.motivo||'')}</div>`+
+  b=dvBox(`<div style="font-weight:700">🔀 Mudança de destino — aguardando aprovação</div><div>📍 Levar para: <strong>${esc(dv.local||'—')}</strong></div><div>👷 Para: <strong>${esc(dv.para||'—')}</strong></div><div class="m">Pedido por ${esc(dv.solic_por||'—')} · ${dv.solic_em?fmt(dv.solic_em):''}</div><div>💬 ${esc(dv.motivo||'')}</div><div class="m" style="margin-top:6px">⏳ Enquanto não for decidido, não entregue a ferramenta em nenhum lugar: aguarde a aprovação ou a negativa (se negada, o destino é o CIMI).</div>`+
    (podeAprovar()?`<div class="acts" style="margin-top:10px"><button class="btn" style="flex:1" onclick="desvioDecidir('${x.id}',true)">✔ Aprovar</button><button class="btn r" style="flex:1" onclick="desvioDecidir('${x.id}',false)">✖ Negar</button></div>`:'<div class="m" style="margin-top:6px">Só Supervisor, Coordenador ou ADM podem aprovar.</div>'))}
  else if(dv&&dv.destino_status==='aprovado'){
-  b=dvBox(`<div style="font-weight:700;color:var(--gd)">✔ Destino alternativo AUTORIZADO</div><div>📍 Levar para: <strong>${esc(dv.local||'—')}</strong></div><div>👷 Para: <strong>${esc(dv.para||'—')}</strong></div><div class="m">Aprovado por ${esc(dv.decisao_por||'—')} · ${dv.decisao_em?fmt(dv.decisao_em):''}${dv.decisao_obs?' · '+esc(dv.decisao_obs):''}</div><div>💬 ${esc(dv.motivo||'')}</div>`+
-   (x.status==='recolhido'&&pode?`<button class="btn" style="width:100%;margin-top:10px;padding:14px;font-size:16px" onclick="desvioEntregar('${x.id}')">📍 Entreguei no destino — enviar foto</button>`:'')+
-   (x.status==='pendente'&&pode?'<div class="m" style="margin-top:6px">Primeiro recolha o material (botão acima); depois leve ao destino autorizado.</div>':''),'var(--g)','#e9f7ee')}
+  b=dvBox(`<div style="font-weight:700;color:var(--gd)">✔ ENTREGA AUTORIZADA — levar ao destino abaixo</div><div>📍 Levar para: <strong>${esc(dv.local||'—')}</strong></div><div>👷 Para: <strong>${esc(dv.para||'—')}</strong></div><div class="m">Aprovado por ${esc(dv.decisao_por||'—')} · ${dv.decisao_em?fmt(dv.decisao_em):''}${dv.decisao_obs?' · '+esc(dv.decisao_obs):''}</div><div>💬 ${esc(dv.motivo||'')}</div>`+
+   (x.status==='recolhido'&&pode?`<button class="btn" style="width:100%;margin-top:10px;padding:14px;font-size:16px" onclick="desvioEntregar('${x.id}')">📍 ② Entreguei a ${esc(dv.para||'o destinatário')} — enviar foto da entrega</button>`:'')+
+   (x.status==='pendente'&&pode?`<div class="m" style="margin-top:6px">① Retire a ferramenta no local (botão acima) e envie a foto. ② Depois leve e entregue a <strong>${esc(dv.para||'—')}</strong> em <strong>${esc(dv.local||'—')}</strong>.</div>`:''),'var(--g)','#e9f7ee')}
  else if(dv&&dv.destino_status==='negado'){b=dvBox(`<div style="font-weight:700;color:var(--r,#c0392b)">✖ Mudança de destino NEGADA — segue para o CIMI</div><div class="m">${esc(dv.decisao_por||'—')} · ${dv.decisao_em?fmt(dv.decisao_em):''}</div><div>💬 ${esc(dv.decisao_obs||'')}</div>`,'#c0392b','#fdecea')}
  if(dv&&dv.entregue_em){b+=dvBox(`<div style="font-weight:700">📍 Entregue em ${esc(dv.local||'—')}</div><div class="m">Levado por ${esc(dv.entregue_por||'—')} · recebido por <strong>${esc(dv.receptor||'—')}</strong> · ${fmt(dv.entregue_em)}</div>${dv.token?(dv.conf_status==='confirmada'?`<div style="margin-top:6px"><span class="bd disponivel">✔ Recebimento confirmado</span> <span class="m">${esc(dv.conf_nome||'')} · ${dv.conf_em?fmt(dv.conf_em):''}</span></div>`:dv.conf_status==='contestada'?`<div style="margin-top:6px;color:#c0392b;font-weight:700">⚠ O recebedor apontou divergência: <span style="font-weight:400">${esc(dv.conf_obs||'')}</span></div>`:`<div style="margin-top:6px"><span class="bd em_uso">⏳ Aguardando confirmação de ${esc(dv.receptor||'')}</span></div>${pode?`<button class="btn s o" style="margin-top:6px" onclick="desvioLink('${x.id}')">📲 Link/QR</button>`:''}`):''}${dv.obs?`<div>💬 ${esc(dv.obs)}</div>`:''}${dv.foto?`<img src="${esc(dv.foto)}" style="max-width:200px;max-height:200px;border-radius:8px;cursor:pointer;margin-top:8px;border:1px solid var(--b)" onclick="foto('${esc(dv.foto)}')">`:''}`,'var(--g)','#e9f7ee')}
  if((!dv||dv.destino_status==='negado')&&ativo&&pode)b+=`<button class="btn o" style="width:100%;margin-top:10px;padding:12px" onclick="desvioPedir('${x.id}')">🔀 Mudar destino (urgência) — precisa de aprovação</button>`;
@@ -172,7 +172,7 @@ function desvioDecidir(id,ap){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
    if(data==='ok'){m.remove();toast(ap?'Aprovada ✔ — o pedido seguiu para a aba Recolhimentos':'Negada — o pedido segue para o CIMI (aba Recolhimentos)');await dvRefresh()}else{b.disabled=false;er.textContent=dvMsg[data]||'Não foi possível concluir ('+data+').'}}
   catch(x2){b.disabled=false;const ms=String(x2.message||x2);er.textContent=/permission denied/i.test(ms)?'Sem permissão no banco ('+ms+'). Isso NÃO é a senha: atualize a página com Ctrl+F5 e tente de novo. Se continuar, avise o suporte.':'Erro: '+ms}}}
 function desvioEntregar(id){const x=(RC||[]).find(r=>r.id===id);if(!x||!x.dv)return;
- const m=mkModal(`<h3>📍 Entrega no destino autorizado</h3><div><strong>${esc(x.ferramenta)}</strong><div>📍 ${esc(x.dv.local||'—')}</div><div class="m">Aprovado por ${esc(x.dv.decisao_por||'—')}</div></div>
+ const m=mkModal(`<h3>📍 ② Entrega ao destinatário</h3><div><strong>${esc(x.ferramenta)}</strong><div>📍 ${esc(x.dv.local||'—')}</div><div class="m">Aprovado por ${esc(x.dv.decisao_por||'—')}</div></div>
  <label>Quem recebeu no local (confirme o nome)</label><input id="dr" value="${esc(x.dv.para||'')}">
  <label>Foto da entrega (obrigatória)</label><input type="file" id="df" accept="image/*" capture="environment"><div id="dp" style="margin:8px 0"></div>
  <label>Observação (opcional)</label><textarea id="do" rows="2"></textarea><div class="err" id="de"></div>
@@ -213,6 +213,12 @@ function aprovView(){
  ${pend.map(pc).join('')}
  ${dec.length?`<h3 style="margin:18px 0 8px">Decididas recentemente</h3>${dec.map(dc).join('')}`:''}`}
 const rcManter=x=>x.status==='concluido'&&String(x.ferramenta||'').toUpperCase()==='CARRINHO DE MÃO'&&String(x.solicitante||'').trim().toLowerCase()==='davson rocha silva'||new Date(x.quando)>new Date('2026-10-30T20:00:00Z');
+const ent=x=>!!(x&&x.dv&&x.dv.destino_status==='aprovado');
+const entRec=id=>ent((RC||[]).find(y=>y.id===id));
+// Cenário 1: destino CIMI · Cenário 2: destino alternativo autorizado (ent = autorizado e ainda não entregue; altDest = autorizado ou já entregue) · Em análise: sol
+const altDest=x=>!!(x&&x.dv&&(['aprovado','concluido'].includes(x.dv.destino_status)||x.dv.entregue_em));
+const solDest=x=>!!(x&&x.dv&&x.dv.destino_status==='solicitado');
+const altRec=id=>altDest((RC||[]).find(y=>y.id===id)),solRec=id=>solDest((RC||[]).find(y=>y.id===id));
 const rcPend=()=>(RC||[]).filter(x=>x.status==='pendente'&&!rcHid(x));
 const rcRec=()=>(RC||[]).filter(x=>x.status==='recolhido'&&!rcHid(x));
 let rcTab='pend';const rcGo=t=>{rcTab=t;if(me.papel==='logistica')logView();else render()};
@@ -222,10 +228,10 @@ async function carregaRC(){if(RCbusy)return;RCbusy=true;
  RCbusy=false;if(me&&me.papel==='logistica')logView();else render()}
 function recolHtml(){
  if(RC===null){carregaRC();return'<p class="m">Carregando pedidos…</p>'}
- const cm=me.papel!=='logistica',pode=['logistica','principal'].includes(me.papel),p=rcPend(),tr=rcRec(),ok=RC.filter(x=>x.status==='concluido');
+ const cm=me.papel!=='logistica',pode=['logistica','principal'].includes(me.papel),p=rcPend(),tr=rcRec(),ok=RC.filter(x=>x.status==='concluido'),pE=p.filter(ent),pC=p.filter(x=>!ent(x)&&!solDest(x)),pS=p.filter(solDest),trE=tr.filter(ent),trC=tr.filter(x=>!ent(x)&&!solDest(x)),trS=tr.filter(solDest),okE=ok.filter(altDest),okC=ok.filter(x=>!altDest(x));
  const bt=(u,l)=>u?`<div style="margin-top:8px"><div class="m">${l}</div><img src="${esc(u)}" style="max-width:200px;max-height:200px;border-radius:8px;cursor:pointer;border:1px solid var(--b)" onclick="foto('${esc(u)}')"></div>`:'';
- const card0=x=>{const pe=x.status==='pendente',tra=x.status==='recolhido',cor=pe?'var(--o)':tra?'var(--bl)':'var(--g)',
-  tit=pe?'🔔 RECOLHER MATERIAL':tra?(cm?'🚚 RECOLHIDO PELA LOGÍSTICA · AGUARDANDO RECEBIMENTO NO CIMI':'🚚 RECOLHIDO · LEVAR AO CIMI (o CIMI confirma o recebimento)'):'✔ RECEBIDO NO CIMI';
+ const card0=x=>{const pe=x.status==='pendente',tra=x.status==='recolhido',ea=ent(x),ad=altDest(x),sd=solDest(x),cor=pe?'var(--o)':tra?'var(--bl)':'var(--g)',
+ tit=pe?(ea?'🚚 ENTREGA AUTORIZADA · ① RETIRAR NO LOCAL':sd?'🔀 DESTINO EM ANÁLISE · RECOLHER MATERIAL':'🔔 RECOLHER MATERIAL'):tra?(ea?(cm?'🚚 RETIRADO PELA LOGÍSTICA · A CAMINHO DO DESTINO':'🚚 RETIRADO · ② LEVAR E ENTREGAR NO DESTINO'):sd?'🚚 RETIRADO · AGUARDANDO APROVAÇÃO DO DESTINO':(cm?'🚚 RECOLHIDO PELA LOGÍSTICA · AGUARDANDO RECEBIMENTO NO CIMI':'🚚 RECOLHIDO · LEVAR AO CIMI (o CIMI confirma o recebimento)')):(ad?'✔ ENTREGUE NO DESTINO AUTORIZADO':'✔ RECEBIDO NO CIMI');
   return`<div class="card" style="margin-bottom:12px;border-left:6px solid ${cor}">
   <div style="font-size:12px;font-weight:700;color:${cor}">${tit}</div>
   <div style="font-size:20px;font-weight:800;margin:4px 0">${esc(x.ferramenta)} <span class="m">${esc(x.patrimonio||'')}</span></div>${x.avulso?'<div><span class="pill u">📦 Material avulso (sem ferramenta cadastrada)</span></div>':''}
@@ -234,33 +240,33 @@ function recolHtml(){
   <div class="m">Pedido de <strong>${esc(x.solicitante||'—')}</strong> · ${fmt(x.quando)}</div>
   ${x.obs?`<div style="margin-top:6px">💬 ${esc(x.obs)}</div>`:''}
   ${bt(x.foto_pedido,'📷 Foto enviada por quem pediu (onde está / o que recolher)')}
-  ${!pe?`<div class="m" style="margin-top:8px">🚚 Recolhido por ${esc(x.recolhido_por||'—')} · ${x.recolhido_em?fmt(x.recolhido_em):''}</div>${bt(x.foto,'📷 Foto do recolhimento')}`:''}
-  ${x.status==='concluido'?`<div class="m" style="margin-top:8px">📥 Recebido no CIMI por ${esc(x.recebido_por||'—')} · ${x.recebido_em?fmt(x.recebido_em):''}</div>${x.recebido_obs?`<div>💬 ${esc(x.recebido_obs)}</div>`:''}${bt(x.recebido_foto,'📷 Foto do recebimento no CIMI')}`:''}
-  ${pe&&pode?`<button class="btn" style="width:100%;margin-top:12px;padding:14px;font-size:16px" onclick="recolher('${x.id}')">📷 Recolhi — enviar foto</button>`:''}
-  ${pe&&!pode?'<div class="m" style="margin-top:8px">⏳ Aguardando a Logística recolher.</div>':''}
-  ${tra&&cm?`<button class="btn" style="width:100%;margin-top:12px;padding:14px;font-size:16px" onclick="cimiReceber('${x.id}')">📥 Recebi no CIMI — enviar foto e dar baixa</button>`:''}
-  ${tra&&!cm?'<div class="m" style="margin-top:8px">⏳ Entregue o material no CIMI. A baixa só é dada quando o CIMI confirmar o recebimento.</div>':''}</div>`};
+  ${!pe?`<div class="m" style="margin-top:8px">🚚 ${ea||ad?'Retirado':'Recolhido'} por ${esc(x.recolhido_por||'—')} · ${x.recolhido_em?fmt(x.recolhido_em):''}</div>${bt(x.foto,ea||ad?'📷 Foto da retirada no local':'📷 Foto do recolhimento')}`:''}
+  ${x.status==='concluido'&&!ad?`<div class="m" style="margin-top:8px">📥 Recebido no CIMI por ${esc(x.recebido_por||'—')} · ${x.recebido_em?fmt(x.recebido_em):''}</div>${x.recebido_obs?`<div>💬 ${esc(x.recebido_obs)}</div>`:''}${bt(x.recebido_foto,'📷 Foto do recebimento no CIMI')}`:''}
+  ${pe&&pode?`<button class="btn" style="width:100%;margin-top:12px;padding:14px;font-size:16px" onclick="recolher('${x.id}')">${ea?'📷 ① Retirei no local — enviar foto':'📷 Recolhi — enviar foto'}</button>`:''}
+  ${pe&&!pode?`<div class="m" style="margin-top:8px">⏳ Aguardando a Logística ${ea?'retirar e entregar':'recolher'}.</div>`:''}
+  ${tra&&cm&&!ea&&!sd?`<button class="btn" style="width:100%;margin-top:12px;padding:14px;font-size:16px" onclick="cimiReceber('${x.id}')">📥 Recebi no CIMI — enviar foto e dar baixa</button>`:''}
+  ${tra&&!cm&&!ea&&!sd?'<div class="m" style="margin-top:8px">⏳ Entregue o material no CIMI. A baixa só é dada quando o CIMI confirmar o recebimento.</div>':''}${tra&&sd?'<div class="m" style="margin-top:8px">⏳ Material retirado. Aguarde a decisão sobre o destino: aprovado → entregue no destino autorizado; negado → leve ao CIMI.</div>':''}</div>`};
  const card=x=>cardDv(card0(x),x,cm);
- const partes=[];if(p.length)partes.push(`🔔 ${p.length} pedido${p.length>1?'s':''} de recolhimento`);if(tr.length)partes.push(cm?`📥 ${tr.length} para o CIMI receber`:`🚚 ${tr.length} aguardando recebimento do CIMI`);
+ const partes=[];if(pE.length)partes.push(`🚚 ${pE.length} entrega${pE.length>1?'s':''} autorizada${pE.length>1?'s':''}`);if(pC.length)partes.push(`🔔 ${pC.length} pedido${pC.length>1?'s':''} de recolhimento`);if(pS.length)partes.push(`🔀 ${pS.length} com destino aguardando aprovação`);if(trE.length)partes.push(`🚚 ${trE.length} a caminho do destino`);if(trC.length)partes.push(cm?`📥 ${trC.length} para o CIMI receber`:`🚚 ${trC.length} aguardando recebimento do CIMI`);
  const dvp=[];if(dvp.length)partes.unshift(`🔀 ${dvp.length} mudança${dvp.length>1?'s':''} de destino para aprovar`);
  const secDv=dvp.length?`<h3 style="margin:4px 0 8px">🔀 Demandas extraordinárias — aguardando sua aprovação</h3>${dvp.map(card).join('')}`:'';
- const alerta=p.length>0||(cm&&tr.length>0)||dvp.length>0;
+ const alerta=p.length>0||(cm&&trC.length>0)||dvp.length>0;
  return`${RCerr?`<p class="err">Não foi possível carregar os pedidos: ${esc(RCerr)}</p>`:''}
  <div class="card" style="margin-bottom:14px;background:${alerta?'#fff4e5':'#e9f7ee'};border-color:${alerta?'var(--o)':'var(--g)'};display:flex;align-items:center;gap:10px;flex-wrap:wrap">
   <strong style="font-size:18px;flex:1">${partes.length?partes.join(' · '):'✔ Nenhum pedido pendente'}</strong><button class="btn o" onclick="carregaRC()">↻ Atualizar</button></div>
  ${secDv}<div class="acts" style="margin-bottom:14px">
   <button class="btn ${rcTab==='pend'?'':'o'}" style="flex:1;padding:12px" onclick="rcGo('pend')">🔔 Solicitações pendentes (${p.length})</button>
   <button class="btn ${rcTab==='rec'?'':'o'}" style="flex:1;padding:12px" onclick="rcGo('rec')">🚚 Recolhidos (${tr.length+ok.length})</button></div>
- ${rcTab==='pend'?(p.length?p.map(card).join(''):'<p class="m">Nenhuma solicitação pendente.</p>')
-  :`${tr.length?`<h3 style="margin:4px 0 8px">${cm?'A caminho do CIMI — aguardando recebimento':'Recolhidos — levar ao CIMI'}</h3>${tr.map(card).join('')}`:''}${ok.length?`<h3 style="margin:18px 0 8px">${cm?'Recebidos no CIMI':'Entregues ao CIMI'} (últimos 30 dias)</h3>${ok.map(card).join('')}`:''}${tr.length||ok.length?'':'<p class="m">Nenhuma ferramenta recolhida ainda.</p>'}`}`}
+ ${rcTab==='pend'?(p.length?`${pE.length?`<h3 style="margin:4px 0 8px">🚚 Entregas autorizadas — retirar e entregar</h3>${pE.map(card).join('')}`:''}${pC.length?`${pE.length?'<h3 style="margin:18px 0 8px">🔔 Recolher para o CIMI</h3>':''}${pC.map(card).join('')}`:''}${pS.length?`<h3 style="margin:18px 0 8px">🔀 Destino aguardando aprovação</h3>${pS.map(card).join('')}`:''}`:'<p class="m">Nenhuma solicitação pendente.</p>')
+  :`${trE.length?`<h3 style="margin:4px 0 8px">🚚 ${cm?'A caminho do destino autorizado':'Retirados — levar e entregar no destino'}</h3>${trE.map(card).join('')}`:''}${trC.length?`<h3 style="margin:${trE.length?18:4}px 0 8px">${cm?'A caminho do CIMI — aguardando recebimento':'Recolhidos — levar ao CIMI'}</h3>${trC.map(card).join('')}`:''}${trS.length?`<h3 style="margin:18px 0 8px">🔀 Retirados — destino aguardando aprovação</h3>${trS.map(card).join('')}`:''}${okC.length?`<h3 style="margin:18px 0 8px">${cm?'Recebidos no CIMI':'Entregues ao CIMI'} (últimos 30 dias)</h3>${okC.map(card).join('')}`:''}${okE.length?`<h3 style="margin:18px 0 8px">📍 Entregues nos destinos autorizados (últimos 30 dias)</h3>${okE.map(card).join('')}`:''}${tr.length||ok.length?'':'<p class="m">Nenhuma ferramenta recolhida ainda.</p>'}`}`}
 function logView(){const n=rcPend().length;document.title=(n?`(${n}) `:'')+'CIMI · Logística';
  $('#app').innerHTML=`<header><h1>🚚 CIMI · Logística</h1><small>${esc(me.nome)}</small><button class="btn o s" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></header><main style="max-width:720px;padding:14px">${recolHtml()}</main>`}
 function iniciaLogistica(){logView();setInterval(()=>{if(!document.hidden&&!document.querySelector('.mask'))carregaRC()},20000);
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)carregaRC()})}
-function recolher(id){const x=RC.find(r=>r.id===id);if(!x)return;const m=document.createElement('div');m.className='mask';
- m.innerHTML=`<div class="modal"><h3>📷 Confirmar recolhimento</h3><div><strong>${esc(x.ferramenta)}</strong> <span class="m">${esc(x.patrimonio||'')}</span><div class="m">${esc(x.local||'')} → levar ao CIMI (o CIMI confirma o recebimento e dá a baixa)</div>${x.foto_pedido?`<div class="m" style="margin-top:8px">📷 Foto enviada por quem pediu:</div><img src="${esc(x.foto_pedido)}" style="max-width:100%;max-height:200px;border-radius:8px" onclick="foto('${esc(x.foto_pedido)}')">`:''}</div>
- <label>Foto que comprova o recolhimento (obrigatória)</label><input type="file" id="rf" accept="image/*" capture="environment"><div id="rp" style="margin:8px 0"></div><div class="err" id="re"></div>
- <div class="acts" style="margin-top:14px"><button class="btn" id="rok" style="flex:1;padding:12px">✔ Confirmar recolhimento</button><button class="btn o" id="rno">Cancelar</button></div></div>`;
+function recolher(id){const x=RC.find(r=>r.id===id);if(!x)return;const ea=ent(x);const m=document.createElement('div');m.className='mask';
+ m.innerHTML=`<div class="modal"><h3>${ea?'📷 ① Confirmar retirada no local':'📷 Confirmar recolhimento'}</h3><div><strong>${esc(x.ferramenta)}</strong> <span class="m">${esc(x.patrimonio||'')}</span><div class="m">${esc(x.local||'')} → ${ea?'levar e entregar a <strong>'+esc(x.dv.para||'—')+'</strong> em <strong>'+esc(x.dv.local||'—')+'</strong>':solDest(x)?'aguardar a decisão do destino (aprovado: entregar no destino autorizado · negado: levar ao CIMI)':'levar ao CIMI (o CIMI confirma o recebimento e dá a baixa)'}</div>${x.foto_pedido?`<div class="m" style="margin-top:8px">📷 Foto enviada por quem pediu:</div><img src="${esc(x.foto_pedido)}" style="max-width:100%;max-height:200px;border-radius:8px" onclick="foto('${esc(x.foto_pedido)}')">`:''}</div>
+ <label>${ea?'Foto que comprova a retirada da ferramenta (obrigatória)':'Foto que comprova o recolhimento (obrigatória)'}</label><input type="file" id="rf" accept="image/*" capture="environment"><div id="rp" style="margin:8px 0"></div><div class="err" id="re"></div>
+ <div class="acts" style="margin-top:14px"><button class="btn" id="rok" style="flex:1;padding:12px">${ea?'✔ Confirmar retirada':'✔ Confirmar recolhimento'}</button><button class="btn o" id="rno">Cancelar</button></div></div>`;
  document.body.appendChild(m);const c=()=>m.remove();m.querySelector('#rno').onclick=c;
  m.querySelector('#rf').onchange=e=>{const f=e.target.files[0];m.querySelector('#rp').innerHTML=f?`<img src="${URL.createObjectURL(f)}" style="max-width:100%;max-height:240px;border-radius:10px">`:''};
  m.querySelector('#rok').onclick=async e=>{const b=e.target,er=m.querySelector('#re'),fl=m.querySelector('#rf').files[0];er.textContent='';
@@ -270,7 +276,7 @@ function recolher(id){const x=RC.find(r=>r.id===id);if(!x)return;const m=documen
    const {error:ue}=await sb.storage.from('fotos').upload(pa,bl,{contentType:'image/jpeg'});if(ue)throw ue;
    const url=sb.storage.from('fotos').getPublicUrl(pa).data.publicUrl;
    const {data,error}=await sb.rpc('logistica_recolher',{p_id:id,p_foto:url});if(error)throw error;
-   if(data==='ok'||data==='ja_recolhido'){c();toast(data==='ok'?'Recolhimento registrado ✔ — leve ao CIMI; a baixa é dada pelo CIMI':'Este pedido já havia sido recolhido');carregaRC()}
+   if(data==='ok'||data==='ja_recolhido'){c();toast(data==='ok'?(ea?'Retirada registrada ✔ — agora leve e entregue ao destino autorizado':solDest(x)?'Retirada registrada ✔ — aguarde a decisão do destino antes de entregar':'Recolhimento registrado ✔ — leve ao CIMI; a baixa é dada pelo CIMI'):'Este pedido já havia sido recolhido');carregaRC()}
    else{b.disabled=false;er.textContent=data==='foto_obrigatoria'?'A foto é obrigatória.':'Sem permissão para recolher.'}}
   catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}}
 function cimiReceber(id){const rr=(D.rc||[]).find(r=>r.id===id),xr=(RC||[]).find(r=>r.id===id);if(!rr&&!xr)return;
@@ -446,7 +452,7 @@ async function carregaEX(){if(EXbusy)return;EXbusy=true;
  catch(e){EX=EX||{pessoa:null,itens:[],pedidos:[]};EXerr=e.message||String(e)}
  EXbusy=false;exView()}
 const exPend=()=>(EX?.itens||[]).filter(x=>x.via_logistica&&x.conf_status==='pendente');
-const exSt=s=>s==='pendente'?'🔔 Retirada solicitada — aguardando a Logística':s==='recolhido'?'🚚 Recolhida pela Logística — a caminho do CIMI':s==='concluido'?'✔ Concluída — recebida no CIMI':s==='cancelado'?'Cancelada':(s||'—');
+const exSt=s=>s==='pendente'?'🔔 Retirada solicitada — aguardando a Logística':s==='recolhido'?'🚚 Retirada pela Logística — a caminho (CIMI ou destino autorizado)':s==='concluido'?'✔ Concluída — recebida no CIMI ou entregue no destino autorizado':s==='cancelado'?'Cancelada':(s||'—');
 function exCard(x,conf){return`<div class="card" style="margin-bottom:12px;border-left:6px solid ${conf?'var(--o)':'var(--g)'}">
  ${conf?'<div style="font-size:12px;font-weight:700;color:var(--o)">📦 ENTREGA AGUARDANDO O SEU RECEBIMENTO</div>':''}
  <div style="font-size:20px;font-weight:800;margin:4px 0">${esc(x.nome)} <span class="m">${esc(x.patrimonio||'')}</span></div>
@@ -623,7 +629,7 @@ function retirar(f){const gi=x=>{const i=GRUPOS.indexOf(x.grupo);return i<0?99:i
   pid.previousElementSibling.textContent=on?'👷 Quem vai receber no local (essa pessoa confirmará o recebimento)':'👷 Pessoa';
   ou.previousElementSibling.textContent='Ou digite o nome (se não estiver cadastrada)';
   ft.previousElementSibling.textContent=on?'📷 Foto da entrega (ferramenta / quem levou) (obrigatória)':'📷 Foto de quem retirou (obrigatória)';const pp=D.p.find(x=>x.id===pid.value);cfm.previousElementSibling.style.display=cfm.style.display=on&&pp?.usuario_id?'':'none'};md.onchange=pid.onchange=tg;tg()}
-function entregar(f){if(recAtiva(f.id))return toast(recAtiva(f.id).status==='recolhido'?'Esta ferramenta foi recolhida pela Logística: use "Receber" para dar a baixa.':'Há um recolhimento pendente: a baixa só é liberada depois que a Logística recolher e levar ao CIMI.');form(`Devolver ao CIMI: ${esc(f.nome)}`,[...pessoaFields(D.p.find(x=>x.nome===f.responsavel_atual)?.id),
+function entregar(f){if(recAtiva(f.id))return toast(altRec(recAtiva(f.id).id)?'Esta ferramenta tem entrega autorizada para outro local: a Logística entrega no destino. Não é devolução ao CIMI.':solRec(recAtiva(f.id).id)?'Há uma mudança de destino aguardando aprovação: aguarde a decisão antes de dar baixa.':recAtiva(f.id).status==='recolhido'?'Esta ferramenta foi recolhida pela Logística: use "Receber" para dar a baixa.':'Há um recolhimento pendente: a baixa só é liberada depois que a Logística recolher e levar ao CIMI.');form(`Devolver ao CIMI: ${esc(f.nome)}`,[...pessoaFields(D.p.find(x=>x.nome===f.responsavel_atual)?.id),
  {k:'foto',l:'📷 Foto de quem entregou (obrigatória)',t:'file'},{k:'obs',l:'Observação (estado da ferramenta)',t:'area'}],'Confirmar entrega',async v=>{
   const {p,nome}=quem(v);if(!nome||!v.foto)return'Escolha a pessoa e tire a foto.';const url=await upload(v.foto,f.id);
   let r=await sb.from('movimentacoes').insert({ferramenta_id:f.id,tipo:'entrega',local_id:f.local_atual_id,pessoa:nome,pessoa_id:p?.id||null,foto_url:url,obs:v.obs,usuario_id:me.id,usuario_nome:me.nome});if(r.error)throw r.error;
@@ -686,6 +692,7 @@ function render(){
  <nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';q='';render()">${t[1]}</button>`).join('')}</nav><main>${{painel,hist:histView,locais,pessoas,funcoes,edic,acessos,recol:recolHtml,aprov:aprovView}[tab]()}</main>`;
  const s=$('#q');if(s){s.oninput=e=>{q=e.target.value;const p=e.target.selectionStart;render();const n=$('#q');n.focus();n.setSelectionRange(p,p)}}}
 const recAtiva=fid=>(D.rc||[]).find(r=>r.ferramenta_id===fid&&(r.status==='pendente'||r.status==='recolhido'));
+const recAcao=r=>{const e=altRec(r.id),s=solRec(r.id);return r.status==='recolhido'?(e?`<span class="m">🚚 Entrega ao destino em andamento</span>`:s?`<span class="m">⏳ Aguardando aprovação do destino</span>`:`<button class="btn s" onclick="cimiReceber('${r.id}')">📥 Receber</button>`):(e?`<span class="m" title="Entrega autorizada: a Logística retira no local e entrega ao destino">🔒 Aguardando Logística (entrega autorizada)</span>`:s?`<span class="m" title="Mudança de destino aguardando aprovação">🔒 Aguardando aprovação / Logística</span>`:`<span class="m" title="A baixa só é liberada depois que a Logística recolher e levar ao CIMI">🔒 Aguardando Logística</span>`)};
 function painel(){const c=k=>D.f.filter(x=>x.status===k).length;
  const nU=u=>D.f.filter(x=>u==='sem'?!x.uso:x.uso===u).length;
  const uCard=(id,ic,nome,cor,n)=>`<button class="gc ${usoSel===id?'on':''}" style="--c:${cor}" onclick="usoSel='${id}';render()"><span class="ic">${ic}</span><b>${nome}</b><span class="n">${n}</span> <span style="font-size:13px">ferramentas</span><div class="bar2"><i style="width:${D.f.length?Math.round(n/D.f.length*100):0}%"></i></div></button>`;
@@ -697,12 +704,12 @@ function painel(){const c=k=>D.f.filter(x=>x.status===k).length;
  <button class="btn" onclick="novaF()">+ Nova ferramenta</button></div>
  <div class="tw"><table><tr><th>Ferramenta</th><th>Patrimônio</th><th>Status</th><th>Local atual</th><th>Com quem</th><th>Ações</th></tr>
  ${list.map(f=>`<tr><td><b>${esc(f.nome)}</b><div class="m">${esc([f.marca,f.modelo].filter(Boolean).join(' · '))}</div>${f.uso?`<span class="pill">${esc((USOS.find(u=>u[0]===f.uso)||[,''])[1])} ${esc(f.uso)}</span>`:''}</td><td>${esc(f.patrimonio||'—')}</td>
- <td><span class="bd ${f.status}">${ST[f.status]}</span>${f.status==='baixa'&&f.motivo_baixa?`<div class="m" style="margin-top:4px;max-width:220px">${esc(f.motivo_baixa)}</div>`:''}</td><td>${esc(L(f.local_atual_id)?.nome||'—')}</td><td>${esc(f.responsavel_atual||'—')}${f.status==='em_uso'&&pend(D.m.find(x=>x.ferramenta_id===f.id)||{})?'<div><span class="bd em_uso">⏳ Aguardando confirmação</span></div>':''}${recAtiva(f.id)?`<div><span class="bd em_uso" style="white-space:normal;display:inline-block;margin-top:4px">${recAtiva(f.id).status==='recolhido'?'🚚 A caminho do CIMI':'🔔 Recolhimento solicitado'}</span></div>`:''}</td>
- <td class="acts">${f.status==='disponivel'?`<button class="btn s y" onclick="act(retirar,'${f.id}',D.f)">Retirar</button>`:''}${f.status==='em_uso'?(recAtiva(f.id)?(recAtiva(f.id).status==='recolhido'?`<button class="btn s" onclick="cimiReceber('${recAtiva(f.id).id}')">📥 Receber</button>`:`<span class="m" title="A baixa só é liberada depois que a Logística recolher e levar ao CIMI">🔒 Aguardando Logística</span>`):`<button class="btn s" onclick="act(entregar,'${f.id}',D.f)">Entregar</button>`):''}
+ <td><span class="bd ${f.status}">${ST[f.status]}</span>${f.status==='baixa'&&f.motivo_baixa?`<div class="m" style="margin-top:4px;max-width:220px">${esc(f.motivo_baixa)}</div>`:''}</td><td>${esc(L(f.local_atual_id)?.nome||'—')}</td><td>${esc(f.responsavel_atual||'—')}${f.status==='em_uso'&&pend(D.m.find(x=>x.ferramenta_id===f.id)||{})?'<div><span class="bd em_uso">⏳ Aguardando confirmação</span></div>':''}${recAtiva(f.id)?`<div><span class="bd em_uso" style="white-space:normal;display:inline-block;margin-top:4px">${recAtiva(f.id).status==='recolhido'?(entRec(recAtiva(f.id).id)?'🚚 A caminho do destino autorizado':'🚚 A caminho do CIMI'):(entRec(recAtiva(f.id).id)?'🚚 Entrega autorizada — aguardando a Logística':'🔔 Recolhimento solicitado')}</span></div>`:''}</td>
+ <td class="acts">${f.status==='disponivel'?`<button class="btn s y" onclick="act(retirar,'${f.id}',D.f)">Retirar</button>`:''}${f.status==='em_uso'?(recAtiva(f.id)?recAcao(recAtiva(f.id)):`<button class="btn s" onclick="act(entregar,'${f.id}',D.f)">Entregar</button>`):''}
  <button class="btn s o" onclick="act(hist,'${f.id}',D.f)">Histórico</button><button class="btn s o" onclick="act(editF,'${f.id}',D.f)">✏️</button></td></tr>`).join('')||'<tr><td colspan=6 class="m">Nenhuma ferramenta encontrada.</td></tr>'}</table></div>`}
 const recsDe=x=>x.tipo==='retirada'?(D.rc||[]).filter(r=>String(r.mov_id)===String(x.id)&&r.status!=='cancelado'):x.recolhimento_id?(D.rc||[]).filter(r=>r.id===x.recolhimento_id):[];
 const recBadge=x=>{const r=recsDe(x).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0];if(!r)return'';
- const t=r.status==='pendente'?['em_uso','🔔 Recolhimento solicitado — aguardando a Logística']:r.status==='recolhido'?['em_uso','🚚 Recolhido pela Logística — aguardando o CIMI receber']:['disponivel','✔ Recolhimento concluído no CIMI'];
+ const t=r.status==='pendente'?['em_uso',altRec(r.id)?'🚚 Entrega autorizada — aguardando a Logística retirar e entregar':solRec(r.id)?'🔀 Destino aguardando aprovação':'🔔 Recolhimento solicitado — aguardando a Logística']:r.status==='recolhido'?['em_uso',altRec(r.id)?'🚚 Retirado pela Logística — a caminho do destino autorizado':solRec(r.id)?'⏳ Retirado — aguardando aprovação do destino':'🚚 Recolhido pela Logística — aguardando o CIMI receber']:['disponivel',altRec(r.id)?'✔ Entregue no destino autorizado':'✔ Recolhimento concluído no CIMI'];
  return`<div style="margin-top:6px"><span class="bd ${t[0]}" style="white-space:normal;display:inline-block">${t[1]}</span></div>`};
 function movDet(id){const x=D.m.find(y=>String(y.id)===String(id));if(!x)return;const fer=F(x.ferramenta_id)||{};
  const ms=D.m.filter(y=>y.ferramenta_id===x.ferramenta_id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
@@ -719,12 +726,17 @@ function movDet(id){const x=D.m.find(y=>String(y.id)===String(id));if(!x)return;
    if(cs==='confirmada'||cs==='contestada')E(cs==='confirmada'?'✔':'⚠',cs==='confirmada'?'Recebimento confirmado no local':'Divergência informada no recebimento',ini.conf_em,[`Por: <b>${esc(ini.conf_nome||'—')}</b>`,ob(ini.conf_obs)],[ph(ini.conf_foto_url,'Foto do recebimento')],cs==='confirmada'?'var(--g)':'var(--r)');
    else E('⏳','Aguardando confirmação do recebimento no local',null,[],[],'var(--o)')}
   rs=(D.rc||[]).filter(r=>String(r.mov_id)===String(ini.id)&&r.status!=='cancelado').sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
-  rs.forEach(r=>{
+  rs.forEach(r=>{const rcx=(RC||[]).find(y=>y.id===r.id)||{},dv=rcx.dv,ea=altDest(rcx);
    E('🔔','Pedido de recolhimento',r.created_at,[`Solicitado por: <b>${esc(r.solicitante||'—')}</b>${r.origem==='link'?' (pelo link)':''}`,ob(r.obs)],[ph(r.foto_pedido_url,'Foto do local / material a recolher')],'var(--o)');
-   if(r.status==='pendente')E('⏳','Aguardando a Logística recolher',null,[],[],'var(--o)');
-   if(r.status!=='pendente')E('🚚','Recolhido pela Logística',r.recolhido_em,[`Por: <b>${esc(r.recolhido_por_nome||'—')}</b> → levado ao CIMI`],[ph(r.foto_url,'Foto do recolhimento')],'var(--bl)');
-   if(r.status==='recolhido')E('⏳','Aguardando recebimento no CIMI',null,[],[],'var(--bl)');
-   if(r.status==='concluido')E('📥','Recebido no CIMI — baixa dada',r.recebido_em,[`Por: <b>${esc(r.recebido_por_nome||'—')}</b>`,ob(r.recebido_obs)],[ph(r.recebido_foto_url,'Foto do recebimento no CIMI')],'var(--g)')})}
+    if(dv&&dv.solic_em){E('🔀','Mudança de destino solicitada',dv.solic_em,[`Levar para: <b>${esc(dv.local||'—')}</b> · para <b>${esc(dv.para||'—')}</b> (em vez do CIMI)`,`Solicitada por: <b>${esc(dv.solic_por||'—')}</b>`,ob(dv.motivo)],[],'var(--o)');
+     if(dv.destino_status==='solicitado')E('⏳','Mudança de destino aguardando aprovação',null,[],[],'var(--o)');
+     else if(dv.decisao_em){const ng=dv.destino_status==='negado';E(ng?'✖':'✔',ng?'Mudança de destino NEGADA — segue para o CIMI':'Mudança de destino APROVADA',dv.decisao_em,[`Por: <b>${esc(dv.decisao_por||'—')}</b>`,ob(dv.decisao_obs)],[],ng?'var(--r)':'var(--g)')}}
+   if(r.status==='pendente')E('⏳',ea?'Aguardando a Logística retirar e entregar':'Aguardando a Logística recolher',null,[],[],'var(--o)');
+   if(r.status!=='pendente')E('🚚',ea?'Retirado pela Logística':'Recolhido pela Logística',r.recolhido_em,[`Por: <b>${esc(r.recolhido_por_nome||'—')}</b> → ${ea?'a caminho de <b>'+esc(dv.local||'—')+'</b>':'levado ao CIMI'}`],[ph(r.foto_url,ea?'Foto da retirada no local':'Foto do recolhimento')],'var(--bl)');
+   if(r.status==='recolhido')E('⏳',ea?'Aguardando a entrega no destino':'Aguardando recebimento no CIMI',null,[],[],'var(--bl)');
+   if(r.status==='concluido'&&dv&&dv.entregue_em){E('📍','Entregue no destino autorizado',dv.entregue_em,[`Local: <b>${esc(dv.local||'—')}</b>`,`Levado por: <b>${esc(dv.entregue_por||'—')}</b> · recebido por <b>${esc(dv.receptor||'—')}</b>`,ob(dv.obs)],[ph(dv.foto,'Foto da entrega')],'var(--g)');
+     if(dv.conf_status==='confirmada'||dv.conf_status==='contestada'){const cf=dv.conf_status==='confirmada';E(cf?'✔':'⚠',cf?'Recebimento confirmado pelo destinatário':'Divergência informada pelo destinatário',dv.conf_em,[`Por: <b>${esc(dv.conf_nome||'—')}</b>`,ob(dv.conf_obs)],[],cf?'var(--g)':'var(--r)')}}
+    else if(r.status==='concluido')E('📥','Recebido no CIMI — baixa dada',r.recebido_em,[`Por: <b>${esc(r.recebido_por_nome||'—')}</b>`,ob(r.recebido_obs)],[ph(r.recebido_foto_url,'Foto do recebimento no CIMI')],'var(--g)')})}
  const fimRec=fim&&fim.recolhimento_id&&rs.some(r=>r.id===fim.recolhimento_id);
  if(fim&&!fimRec)E('↩','Devolução ao CIMI',fim.created_at,[`Entregue por: <b>${esc(fim.pessoa)}</b>`,`Registrado por: ${esc(fim.usuario_nome)}`,ob(fim.obs)],[ph(fim.foto_url,'Foto da devolução')],'var(--g)');
  if(!fim&&fer.status==='em_uso')E('🧰','Ainda em uso',null,[`Com: <b>${esc(fer.responsavel_atual||'—')}</b> · ${esc(L(fer.local_atual_id)?.nome||'—')}`],[],'var(--o)');
@@ -776,7 +788,7 @@ function verPessoaF(id){const p=D.p.find(x=>x.id===id);if(!p)return;
   <div>📍 <b>${esc(loc?.nome||'—')}</b>${loc?.grupo?` <span class="m">(${esc(loc.grupo)})</span>`:''}</div>
   ${x?`<div class="m">${x.via_logistica?`🚚 Entregue pela Logística (${esc(x.logistica_nome||'—')})`:'📤 Retirada direta'} · ${fmt(x.created_at)} · ${dias(x)}</div>
   ${x.via_logistica?`<div style="margin-top:4px">${x.conf_status==='confirmada'?'<span class="bd disponivel">✔ Recebimento confirmado</span>':x.conf_status==='contestada'?'<span class="bd baixa">⚠ Divergência</span>':'<span class="bd em_uso">⏳ Aguardando confirmação</span>'}</div>`:''}`:''}
-  ${rec?`<div style="margin-top:4px"><span class="bd em_uso" style="white-space:normal;display:inline-block">${rec.status==='recolhido'?'🚚 Recolhido pela Logística — a caminho do CIMI':'🔔 Recolhimento solicitado'}</span></div>`:''}
+  ${rec?`<div style="margin-top:4px"><span class="bd em_uso" style="white-space:normal;display:inline-block">${rec.status==='recolhido'?(altRec(rec.id)?'🚚 Retirado pela Logística — a caminho do destino':solRec(rec.id)?'⏳ Retirado — aguardando aprovação do destino':'🚚 Recolhido pela Logística — a caminho do CIMI'):(altRec(rec.id)?'🚚 Entrega autorizada — aguardando a Logística':solRec(rec.id)?'🔀 Destino aguardando aprovação':'🔔 Recolhimento solicitado')}</span></div>`:''}
   <div class="acts" style="margin-top:6px">${x?.foto_url?`<img class="ph" src="${esc(x.foto_url)}" onclick="foto('${esc(x.foto_url)}')">`:''}${x?`<button class="btn s o" onclick="this.closest('.mask').remove();movDet('${x.id}')">🔎 Ver percurso completo</button>`:''}</div></div>`}).join('')||'<p class="m">Nenhuma ferramenta com esta pessoa no momento.</p>'}
  <button class="btn o" style="margin-top:10px" onclick="this.closest('.mask').remove()">Fechar</button></div>`;document.body.appendChild(m)}
 function pessoas(){const t=q.toLowerCase();if(fSel!=='todas'&&!FN(fSel))fSel='todas';
@@ -800,8 +812,8 @@ async function confirmView(tk){let recX='',recBind=()=>{};const box=h=>{$('#app'
  if(error||!i)return box('<p class="err">Link inválido ou expirado. Peça um novo link à Logística ou ao CIMI.</p>');
  const det=`<div class="card" style="margin:10px 0"><div><b>🧰 ${esc(i.ferramenta)}</b> <span class="m">${esc(i.patrimonio||'')}</span></div><div>📍 ${esc(i.local||'')}</div><div>🚚 Entregue por: <b>${esc(i.logistica||'Logística')}</b></div><div class="m">${fmt(i.quando)} · destinatário: ${esc(i.pessoa)}</div></div>`;
  recX=i.recolh==='pendente'?`<div class="card" style="margin:14px 0 0;border-left:4px solid var(--o)">🚚 <strong>Recolhimento solicitado.</strong> A Logística foi avisada e virá buscar a ferramenta no local.</div>`
-  :i.recolh==='recolhido'?`<div class="card" style="margin:14px 0 0;border-left:4px solid var(--bl)">🚚 <strong>Ferramenta recolhida</strong> pela Logística${i.recolh_em?' em '+fmt(i.recolh_em):''}. Ela está a caminho do CIMI.</div>`
-  :i.recolh==='concluido'?`<div class="card" style="margin:14px 0 0;border-left:4px solid var(--g)">✔ <strong>Recolhimento concluído.</strong> A ferramenta foi recebida no CIMI${i.recebido_em?' em '+fmt(i.recebido_em):''}.</div>`
+  :i.recolh==='recolhido'?`<div class="card" style="margin:14px 0 0;border-left:4px solid var(--bl)">🚚 <strong>Ferramenta recolhida</strong> pela Logística${i.recolh_em?' em '+fmt(i.recolh_em):''}. Ela está a caminho do CIMI ou do destino autorizado.</div>`
+  :i.recolh==='concluido'?`<div class="card" style="margin:14px 0 0;border-left:4px solid var(--g)">✔ <strong>Recolhimento concluído.</strong> ${i.recebido_em?'A ferramenta foi recebida no CIMI em '+fmt(i.recebido_em)+'.':'A ferramenta foi recebida (no CIMI ou no destino autorizado).'}</div>`
   :i.pode_recolher?`<button class="btn o" style="width:100%;margin-top:14px;padding:12px" id="crec">📦 Recolher material</button><div id="crecf"></div>`:'';
  recBind=()=>{const b=$('#crec');if(!b)return;b.onclick=()=>{b.style.display='none';
   $('#crecf').innerHTML=`<div class="card" style="margin-top:12px"><div class="m">Avise a Logística para recolher esta ferramenta e levá-la de volta ao CIMI.</div><label>Seu nome completo</label><input id="rn" value="${esc(i.pessoa||'')}"><label>Observação (opcional)</label><textarea id="ro" rows="2" placeholder="Ex.: serviço concluído, está na sala do encarregado"></textarea><label>📷 Foto de onde está a ferramenta e do que deve ser recolhido (opcional, ajuda a Logística)</label><input type="file" id="rfp" accept="image/*"><div id="rpp" style="margin:8px 0"></div><p class="err" id="rerr"></p><button class="btn" style="width:100%" id="rok">Enviar pedido de recolhimento</button></div>`;
