@@ -120,7 +120,7 @@ function recolHtml(){
   tit=pe?'🔔 RECOLHER MATERIAL':tra?(cm?'🚚 RECOLHIDO PELA LOGÍSTICA · AGUARDANDO RECEBIMENTO NO CIMI':'🚚 RECOLHIDO · LEVAR AO CIMI (o CIMI confirma o recebimento)'):'✔ RECEBIDO NO CIMI';
   return`<div class="card" style="margin-bottom:12px;border-left:6px solid ${cor}">
   <div style="font-size:12px;font-weight:700;color:${cor}">${tit}</div>
-  <div style="font-size:20px;font-weight:800;margin:4px 0">${esc(x.ferramenta)} <span class="m">${esc(x.patrimonio||'')}</span></div>
+  <div style="font-size:20px;font-weight:800;margin:4px 0">${esc(x.ferramenta)} <span class="m">${esc(x.patrimonio||'')}</span></div>${x.avulso?'<div><span class="pill u">📦 Material avulso (sem ferramenta cadastrada)</span></div>':''}
   <div>📍 ${esc(x.local||'—')}${x.grupo?` <span class="m">(${esc(x.grupo)})</span>`:''}</div>
   ${x.com?`<div>👷 Com: ${esc(x.com)}</div>`:''}
   <div class="m">Pedido de <strong>${esc(x.solicitante||'—')}</strong> · ${fmt(x.quando)}</div>
@@ -163,7 +163,7 @@ function recolher(id){const x=RC.find(r=>r.id===id);if(!x)return;const m=documen
    else{b.disabled=false;er.textContent=data==='foto_obrigatoria'?'A foto é obrigatória.':'Sem permissão para recolher.'}}
   catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}}
 function cimiReceber(id){const rr=(D.rc||[]).find(r=>r.id===id),xr=(RC||[]).find(r=>r.id===id);if(!rr&&!xr)return;
- const nome=rr?F(rr.ferramenta_id)?.nome:xr.ferramenta,pat=rr?F(rr.ferramenta_id)?.patrimonio:xr.patrimonio,loc=rr?L(rr.local_id)?.nome:xr.local,por=rr?.recolhido_por_nome||xr?.recolhido_por,em=rr?.recolhido_em||xr?.recolhido_em;
+ const nome=rr?(F(rr.ferramenta_id)?.nome||rr.material):xr.ferramenta,pat=rr?F(rr.ferramenta_id)?.patrimonio:xr.patrimonio,loc=rr?L(rr.local_id)?.nome:xr.local,por=rr?.recolhido_por_nome||xr?.recolhido_por,em=rr?.recolhido_em||xr?.recolhido_em;
  const m=document.createElement('div');m.className='mask';
  m.innerHTML=`<div class="modal"><h3>📥 Receber no CIMI e dar baixa</h3><div><strong>${esc(nome||'')}</strong> <span class="m">${esc(pat||'')}</span><div class="m">Recolhido em ${esc(loc||'—')} por ${esc(por||'—')}${em?' · '+fmt(em):''}</div></div>
  <label>Foto da ferramenta recebida no CIMI (obrigatória)</label><input type="file" id="cf2" accept="image/*" capture="environment"><div id="cp2" style="margin:8px 0"></div>
@@ -178,7 +178,7 @@ function cimiReceber(id){const rr=(D.rc||[]).find(r=>r.id===id),xr=(RC||[]).find
    const {error:ue}=await sb.storage.from('fotos').upload(pa,bl,{contentType:'image/jpeg'});if(ue)throw ue;
    const url=sb.storage.from('fotos').getPublicUrl(pa).data.publicUrl;
    const {data,error}=await sb.rpc('cimi_receber',{p_id:id,p_foto:url,p_obs:ob});if(error)throw error;
-   if(data==='ok'||data==='ja_recebido'){c();toast(data==='ok'?'Recebimento registrado ✔ — baixa dada, a ferramenta voltou ao CIMI':'Este recolhimento já havia sido recebido');await load();await carregaRC()}
+   if(data==='ok'||data==='ja_recebido'){c();toast(data==='ok'?((xr&&xr.avulso)||(rr&&!rr.ferramenta_id))?'Recebimento do material registrado ✔':'Recebimento registrado ✔ — baixa dada, a ferramenta voltou ao CIMI':'Este recolhimento já havia sido recebido');await load();await carregaRC()}
    else{b.disabled=false;er.textContent=data==='foto_obrigatoria'?'A foto é obrigatória.':data==='nao_recolhido'?'A Logística ainda não confirmou o recolhimento.':'Sem permissão para dar baixa.'}}
   catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}}
 function perfilAC(id){const u=AC.find(x=>x.id===id);
@@ -353,10 +353,12 @@ function exHtml(){if(EX===null){carregaEX();return'<p class="m">Carregando…</p
  const pen=exPend(),its=EX.itens||[],resto=its.filter(x=>!(x.via_logistica&&x.conf_status==='pendente')),ped=EX.pedidos||[];
  return`<div class="card" style="margin-bottom:12px;display:flex;gap:10px;align-items:center;border-left:6px solid ${pen.length?'var(--o)':'var(--g)'}">
   <strong style="font-size:18px;flex:1">${pen.length?`🔔 ${pen.length} entrega(s) para confirmar`:'✔ Nada aguardando você'}<div class="m" style="font-weight:400">${esc(EX.pessoa.nome)}${EX.pessoa.funcao?' · '+esc(EX.pessoa.funcao):''}</div></strong><button class="btn o" onclick="carregaEX()">↻ Atualizar</button></div>
+ <button class="btn y" style="width:100%;padding:14px;margin-bottom:6px;font-size:16px" onclick="exMaterial()">📸 Pedir retirada de material em outro local</button>
+ <div class="m" style="margin-bottom:12px">Use quando houver material em algum local que não está no seu nome: tire a foto, escolha o local e a Logística recolhe e leva ao CIMI.</div>
  <div class="acts" style="margin-bottom:12px"><button class="btn ${EXtab==='min'?'':'o'}" style="flex:1;padding:12px" onclick="EXtab='min';exView()">🧰 Minhas ferramentas (${its.length})</button><button class="btn ${EXtab==='ped'?'':'o'}" style="flex:1;padding:12px" onclick="EXtab='ped';exView()">📦 Meus pedidos (${ped.length})</button></div>
  ${EXtab==='min'?`${pen.length?`<h3 style="margin:4px 0 8px">Aguardando seu recebimento</h3>${pen.map(x=>exCard(x,true)).join('')}`:''}${resto.length?`<h3 style="margin:${pen.length?18:4}px 0 8px">Sob minha guarda</h3>${resto.map(x=>exCard(x,false)).join('')}`:''}${its.length?'':'<p class="m">Você não tem nenhuma ferramenta sob sua guarda no momento.</p>'}`
  :ped.map(r=>`<div class="card" style="margin-bottom:12px;border-left:6px solid ${r.status==='concluido'?'var(--g)':r.status==='recolhido'?'var(--bl)':'var(--o)'}"><div style="font-size:12px;font-weight:700">${esc(exSt(r.status))}</div>
-  <div style="font-size:18px;font-weight:800;margin:4px 0">${esc(r.ferramenta)} <span class="m">${esc(r.patrimonio||'')}</span></div><div class="m">Pedido em ${fmt(r.quando)}</div>${r.obs?`<div style="margin-top:6px">💬 ${esc(r.obs)}</div>`:''}
+  <div style="font-size:18px;font-weight:800;margin:4px 0">${esc(r.ferramenta)} <span class="m">${esc(r.patrimonio||'')}</span></div>${r.avulso?`<div><span class="pill u">📦 Material avulso</span>${r.local?` <span class="m">📍 ${esc(r.local)}</span>`:''}</div>`:''}<div class="m">Pedido em ${fmt(r.quando)}</div>${r.obs?`<div style="margin-top:6px">💬 ${esc(r.obs)}</div>`:''}
   ${r.recolhido_por?`<div class="m" style="margin-top:6px">🚚 Recolhido por ${esc(r.recolhido_por)}${r.recolhido_em?' · '+fmt(r.recolhido_em):''}</div>`:''}${r.recebido_em?`<div class="m">📥 Recebido no CIMI · ${fmt(r.recebido_em)}</div>`:''}</div>`).join('')||'<p class="m">Você ainda não fez nenhum pedido de retirada (nos últimos 30 dias).</p>'}`}
 function exView(){const n=exPend().length;document.title=(n?`(${n}) `:'')+'CIMI · Minhas ferramentas';
  $('#app').innerHTML=`<header><h1>🛠️ CIMI · Minhas ferramentas</h1><small>${esc(me.nome)}</small><button class="btn o s" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></header><main style="max-width:720px;padding:14px">${exHtml()}</main>`}
@@ -379,6 +381,24 @@ function exConfirmar(movId,acao){const x=(EX?.itens||[]).find(i=>i.mov_id===movI
    try{const url=fl?await exUp(fl):null;const {data,error}=await sb.rpc('exec_confirmar',{p_mov:movId,p_acao:acao,p_obs:ob,p_foto:url});if(error)throw error;
     if(data==='ok'||data==='ja_respondida'){c();toast(data==='ok'?(cf?'Recebimento confirmado ✔':'Divergência registrada ✔'):'Esta entrega já havia sido respondida');await carregaEX()}
     else{b.disabled=false;er.textContent=data==='obs_obrigatoria'?'Explique o que houve na observação.':'Não foi possível registrar ('+data+').'}}
+   catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}})}
+let EXL=null;
+async function exMaterial(){if(!EXL){try{const {data,error}=await sb.rpc('exec_locais');if(error)throw error;EXL=data||[]}catch(e){return toast('Não foi possível carregar os locais: '+(e.message||e)+'. Confirme que o SQL do material avulso foi executado.')}}
+ const gs={};EXL.forEach(l=>(gs[l.grupo||'Outros']=gs[l.grupo||'Outros']||[]).push(l));
+ const opts='<option value="">— Selecione o local onde está o material —</option>'+Object.keys(gs).map(g=>`<optgroup label="${esc(g)}">${gs[g].map(l=>`<option value="${esc(l.id)}">${esc(l.nome)}</option>`).join('')}</optgroup>`).join('');
+ exModal(`<h3>📸 Retirada de material em outro local</h3><p class="m">Para material que está num local mas não está no seu nome. A Logística vai recolher e levar ao CIMI.</p>
+ <label>📍 Local onde está o material (obrigatório)</label><select id="xl" style="width:100%">${opts}</select>
+ <label>O que precisa ser retirado? (obrigatório)</label><input id="xm" placeholder="Ex.: 2 latas de tinta, escada, roçadeira">
+ <label>Observação (opcional)</label><textarea id="xo" rows="2" placeholder="Ex.: está na sala do encarregado"></textarea>
+ <label>📷 Foto do material no local (obrigatória)</label><input type="file" id="xf" accept="image/*" capture="environment"><div id="xp" style="margin:8px 0"></div><div class="err" id="xe"></div>
+ <div class="acts" style="margin-top:14px"><button class="btn y" id="xok" style="flex:1;padding:12px">Enviar para a Logística</button><button class="btn o" id="xno">Cancelar</button></div>`,
+ (m,c,pv)=>{pv('#xf','#xp');m.querySelector('#xno').onclick=c;
+  m.querySelector('#xok').onclick=async e=>{const b=e.target,er=m.querySelector('#xe'),lc=m.querySelector('#xl').value,mt=m.querySelector('#xm').value.trim(),ob=m.querySelector('#xo').value.trim(),fl=m.querySelector('#xf').files[0];er.textContent='';
+   if(!lc)return er.textContent='Selecione o local onde está o material.';if(mt.length<3)return er.textContent='Informe o que precisa ser retirado.';if(!fl)return er.textContent='Tire a foto do material para enviar o pedido.';
+   b.disabled=true;er.textContent='Enviando…';
+   try{const url=await exUp(fl);const {data,error}=await sb.rpc('exec_solicitar_material',{p_local:lc,p_material:mt,p_obs:ob,p_foto:url});if(error)throw error;
+    if(data==='ok'||data==='ja_solicitado'){c();EXtab='ped';toast(data==='ok'?'Pedido enviado à Logística ✔':'Esse pedido já foi enviado há poucos minutos');await carregaEX()}
+    else{b.disabled=false;er.textContent=data==='local_invalido'?'Local inválido.':data==='material_obrigatorio'?'Informe o que precisa ser retirado.':data==='foto_obrigatoria'?'A foto é obrigatória.':'Não foi possível enviar ('+data+').'}}
    catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}})}
 function exSolicitar(fid){const x=(EX?.itens||[]).find(i=>i.ferramenta_id===fid);if(!x)return;
  exModal(`<h3>📦 Solicitar retirada</h3><div><strong>${esc(x.nome)}</strong> <span class="m">${esc(x.patrimonio||'')}</span><div class="m">${esc(x.local||'')} → a Logística vai recolher e levar ao CIMI</div></div>
