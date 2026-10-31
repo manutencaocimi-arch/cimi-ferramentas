@@ -212,7 +212,6 @@ function aprovView(){
   <strong style="font-size:18px;flex:1">${pend.length?`🔀 ${pend.length} mudança${pend.length>1?'s':''} de destino aguardando aprovação`:'✔ Nenhuma aprovação pendente'}</strong><button class="btn o" onclick="carregaRC()">↻ Atualizar</button></div>
  ${pend.map(pc).join('')}
  ${dec.length?`<h3 style="margin:18px 0 8px">Decididas recentemente</h3>${dec.map(dc).join('')}`:''}`}
-const rcManter=x=>x.status==='concluido'&&String(x.ferramenta||'').toUpperCase()==='CARRINHO DE MÃO'&&String(x.solicitante||'').trim().toLowerCase()==='davson rocha silva'||new Date(x.quando)>new Date('2026-10-30T20:00:00Z');
 const ent=x=>!!(x&&x.dv&&x.dv.destino_status==='aprovado');
 const entRec=id=>ent((RC||[]).find(y=>y.id===id));
 // Cenário 1: destino CIMI · Cenário 2: destino alternativo autorizado (ent = autorizado e ainda não entregue; altDest = autorizado ou já entregue) · Em análise: sol
@@ -232,8 +231,7 @@ const rcRec=()=>(RC||[]).filter(x=>x.status==='recolhido'&&!rcHid(x));
 let rcTab='pend';const rcGo=t=>{rcTab=t;if(me.papel==='logistica')logView();else render()};
 async function carregaRC(){if(RCbusy)return;RCbusy=true;
  try{const {data,error}=await sb.rpc('logistica_pendentes');if(error)throw error;RC=data||[];RCerr='';try{const {data:dv}=await sb.rpc('logistica_desvios');const mp=Object.fromEntries((dv||[]).map(d=>[d.id,d]));RC=RC.map(x=>({...x,dv:dvMescla(dvPend(x),mp[x.id])}))}catch(_){RC=RC.map(x=>({...x,dv:dvPend(x)}))}}catch(e){RC=[];RCerr=e.message||String(e)}
- if(me&&me.papel==='logistica')RC=RC.filter(rcManter);
- RCbusy=false;if(me&&me.papel==='logistica')logView();else render()}
+  RCbusy=false;if(me&&me.papel==='logistica')logView();else render()}
 function recolHtml(){
  if(RC===null){carregaRC();return'<p class="m">Carregando pedidos…</p>'}
  const cm=me.papel!=='logistica',pode=['logistica','principal'].includes(me.papel),p=rcPend(),tr=rcRec(),ok=RC.filter(x=>x.status==='concluido'),pE=p.filter(ent),pC=p.filter(x=>!ent(x)&&!solDest(x)),pS=p.filter(solDest),trE=tr.filter(ent),trC=tr.filter(x=>!ent(x)&&!solDest(x)),trS=tr.filter(solDest),okE=ok.filter(altDest),okC=ok.filter(x=>!altDest(x));
