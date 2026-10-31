@@ -138,7 +138,7 @@ function cardDv(h,x,cm){const dv=x.dv,pode=['logistica','principal'].includes(me
  return h.replace(/<\/div>\s*$/,b+'</div>')}
 const mkModal=html=>{const m=document.createElement('div');m.className='mask';m.innerHTML=`<div class="modal">${html}</div>`;document.body.appendChild(m);return m};
 function desvioLink(id){const x=(RC||[]).find(r=>r.id===id);if(!x||!x.dv||!x.dv.token)return;shareConf({token:x.dv.token,pessoa:x.dv.receptor||'',ferr:x.ferramenta,local:x.dv.local||'',logi:x.dv.entregue_por||me.nome})}
-const dvMsg={sem_permissao:'Sem permissão para esta ação.',motivo:'Explique o motivo da urgência (mín. 5 letras).',status_invalido:'Este pedido não está mais ativo.',ja_existe:'Já existe um pedido de mudança de destino para este material.',local_invalido:'Escolha o local de destino.',ja_decidido:'Este pedido já foi decidido por outra pessoa.',obs_obrigatoria:'Para negar, explique o motivo.',sem_aprovacao:'A mudança de destino ainda não foi aprovada.',nao_recolhido:'Confirme primeiro o recolhimento.',foto_obrigatoria:'A foto é obrigatória.',receptor:'Informe o nome de quem recebeu no destino.',para:'Informe para quem vai o material.'};
+const dvMsg={senha_necessaria:'Não foi possível validar sua senha. Atualize a página (Ctrl+F5), digite a senha e tente de novo.',sem_permissao:'Sem permissão para esta ação.',motivo:'Explique o motivo da urgência (mín. 5 letras).',status_invalido:'Este pedido não está mais ativo.',ja_existe:'Já existe um pedido de mudança de destino para este material.',local_invalido:'Escolha o local de destino.',ja_decidido:'Este pedido já foi decidido por outra pessoa.',obs_obrigatoria:'Para negar, explique o motivo.',sem_aprovacao:'A mudança de destino ainda não foi aprovada.',nao_recolhido:'Confirme primeiro o recolhimento.',foto_obrigatoria:'A foto é obrigatória.',receptor:'Informe o nome de quem recebeu no destino.',para:'Informe para quem vai o material.'};
 const dvRefresh=async()=>{await carregaRC();if(me.papel!=='logistica'){await load();render()}};
 async function desvioPedir(id){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
  const {data:ls,error:le}=await sb.rpc('logistica_locais');if(le)return toast('Erro: '+le.message);const {data:ps,error:pe}=await sb.rpc('logistica_pessoas');
@@ -161,14 +161,14 @@ async function desvioPedir(id){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
 function desvioDecidir(id,ap){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
  const m=mkModal(`<h3>${ap?'✔ Aprovar':'✖ Negar'} mudança de destino</h3><div><strong>${esc(x.ferramenta)}</strong><div>📍 ${esc(x.dv?.local||'—')}</div><div>👷 Para: <strong>${esc(x.dv?.para||'—')}</strong></div><div class="m">${esc(x.dv?.motivo||'')}</div></div>
  <label>Observação ${ap?'(opcional)':'(obrigatória ao negar)'}</label><textarea id="do" rows="2"></textarea>
- <label>🔒 Sua senha de acesso (obrigatória para ${ap?'aprovar':'negar'})</label><input type="password" id="dpw" autocomplete="current-password"><div class="err" id="de"></div>
+ <label>🔒 Sua senha de acesso (obrigatória para ${ap?'aprovar':'negar'})</label><input type="password" id="dpw" name="conf-aprov-${Date.now()}" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')" placeholder="Digite sua senha"><div class="err" id="de"></div>
  <div class="acts" style="margin-top:14px"><button class="btn ${ap?'':'r'}" id="dok" style="flex:1;padding:12px">${ap?'Confirmar aprovação':'Confirmar negativa'}</button><button class="btn o" id="dno">Cancelar</button></div>`);
  m.querySelector('#dno').onclick=()=>m.remove();
  m.querySelector('#dok').onclick=async e=>{const b=e.target,er=m.querySelector('#de'),ob=m.querySelector('#do').value.trim();er.textContent='';
   if(!ap&&ob.length<3)return er.textContent='Para negar, explique o motivo.';
   const pw=m.querySelector('#dpw').value;if(!pw)return er.textContent='Digite sua senha de acesso para '+(ap?'aprovar':'negar')+'.';
   b.disabled=true;er.textContent='Conferindo senha…';if(!await checkPw(pw)){b.disabled=false;return er.textContent='Senha incorreta.'}er.textContent='';
-  b.disabled=true;try{const {data,error}=await sb.rpc('desvio_decidir',{p_id:id,p_aprovar:ap,p_obs:ob});if(error)throw error;
+  b.disabled=true;try{const {data,error}=await sb.rpc('desvio_decidir_seguro',{p_id:id,p_aprovar:ap,p_obs:ob});if(error)throw error;
    if(data==='ok'){m.remove();toast(ap?'Aprovada ✔ — o pedido seguiu para a aba Recolhimentos':'Negada — o pedido segue para o CIMI (aba Recolhimentos)');await dvRefresh()}else{b.disabled=false;er.textContent=dvMsg[data]||'Não foi possível concluir ('+data+').'}}
   catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}}
 function desvioEntregar(id){const x=(RC||[]).find(r=>r.id===id);if(!x||!x.dv)return;
