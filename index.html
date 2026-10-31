@@ -197,7 +197,7 @@ function acessos(){if(AC===null){carregaAC();return'<p class="m">Carregando aces
  <div class="tw"><table><tr><th>Usuário</th><th>Login</th><th>E-mail de recuperação</th><th>Papel</th><th>Senha</th><th>Último acesso</th><th>Ações</th></tr>
  ${r.map(u=>`<tr><td><a href="#" title="Ver acessos, movimentações e edições" onclick="verUsuario('${u.id}');return false" style="color:var(--gd);text-decoration:underline"><b title="${esc(u.nome||'')}">${esc(loginDe(u))}</b></a></td><td>${esc(u.email)}</td><td>${esc(u.email_contato||'—')}</td><td>${u.papel==='logistica'?'<span class="pill u">🚚 logística</span>':esc(u.papel)}</td>
  <td>${u.papel==='principal'?'—':u.senha_provisoria?`<span class="bd em_uso">Provisória</span> <button class="btn s o" onclick="verSenha('${u.id}')">👁 Ver</button>`:u.trocar_senha?'<span class="bd em_uso">Provisória</span><div class="m">não registrada</div>':'<span class="bd disponivel">Definida pelo usuário</span><div class="m">oculta (só dá para redefinir)</div>'}</td><td>${u.ultimo_acesso?fmt(u.ultimo_acesso):'nunca'}</td>
- <td class="acts"><button class="btn s y" onclick="novaSenha('${u.id}')">🔑 Nova senha</button><button class="btn s o" onclick="emailAC('${u.id}')">✉️ E-mail</button>${u.papel==='principal'?'':`<button class="btn s o" onclick="perfilAC('${u.id}')">🚚 Perfil</button>`}</td></tr>`).join('')||`<tr><td colspan=7 class="${ACerr?'err':'m'}">${ACerr?'Não foi possível carregar os usuários: '+esc(ACerr)+'. Confirme que a função "acessos" foi publicada no Supabase e clique em ↻ Atualizar.':'Nenhum usuário.'}</td></tr>`}</table></div>`}
+ <td class="acts"><button class="btn s y" onclick="novaSenha('${u.id}')">🔑 Nova senha</button><button class="btn s o" onclick="emailAC('${u.id}')">✉️ E-mail</button>${u.papel==='principal'?'':`<button class="btn s r" title="Volta para a senha inicial 123456 e pede nova senha no próximo acesso" onclick="resetSenha('${u.id}')">↺ Resetar senha</button><button class="btn s o" onclick="perfilAC('${u.id}')">🚚 Perfil</button>`}</td></tr>`).join('')||`<tr><td colspan=7 class="${ACerr?'err':'m'}">${ACerr?'Não foi possível carregar os usuários: '+esc(ACerr)+'. Confirme que a função "acessos" foi publicada no Supabase e clique em ↻ Atualizar.':'Nenhum usuário.'}</td></tr>`}</table></div>`}
 function novaSenha(id){const u=AC.find(x=>x.id===id),a='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
  const g=Array.from(crypto.getRandomValues(new Uint8Array(8)),b=>a[b%a.length]).join('');
  form(`Nova senha: ${esc(loginDe(u))}`,[{k:'nova',l:'Senha provisória (gerada automaticamente, pode editar)',value:g},
@@ -206,6 +206,13 @@ function novaSenha(id){const u=AC.find(x=>x.id===id),a='abcdefghjkmnpqrstuvwxyzA
   if(v.nova.length<6)return'Mínimo de 6 caracteres.';if(!await checkPw(v.minha))return'Sua senha está incorreta.';
   const r=await api('definir_senha',{id,senha:v.nova,enviar:v.enviar==='1'});AC=null;
   alert(`Senha provisória de ${loginDe(u)}:\n\n${v.nova}\n\nO usuário deverá trocá-la no próximo acesso.${r.aviso?'\n\n⚠️ '+r.aviso:''}`)})}
+const SENHA_INICIAL='123456';
+function resetSenha(id){const u=AC.find(x=>x.id===id);if(!u||u.papel==='principal')return;
+ form(`Resetar senha: ${esc(loginDe(u))}`,[{k:'minha',l:`🔒 Sua senha de administrador (confirmação). A senha de ${esc(loginDe(u))} volta para ${SENHA_INICIAL} e o sistema pede uma nova no próximo acesso.`,t:'password'}],`↺ Resetar para ${SENHA_INICIAL}`,async v=>{
+  if(!await checkPw(v.minha))return'Sua senha está incorreta.';
+  const r=await api('definir_senha',{id,senha:SENHA_INICIAL,enviar:false});AC=null;
+  await logEdit('acessos',loginDe(u),[['senha','—','resetada para a senha inicial']]);
+  alert(`Senha de ${loginDe(u)} resetada.\n\nSenha inicial: ${SENHA_INICIAL}\n\nNo próximo acesso o sistema pedirá que ela cadastre uma nova senha.${r.aviso?'\n\n⚠️ '+r.aviso:''}`)})}
 function verSenha(id){const u=AC.find(x=>x.id===id);alert(`Senha provisória de ${loginDe(u)}:\n\n${u.senha_provisoria}`)}
 // ---------- Relatórios (PDF / Excel) ----------
 async function fetchAll(t,fn){let out=[],i=0;for(;;){let q=sb.from(t).select('*').order('created_at',{ascending:false}).range(i,i+999);if(fn)q=fn(q);const {data,error}=await q;if(error)throw error;out=out.concat(data||[]);if(!data||data.length<1000)break;i+=1000}return out}
