@@ -219,6 +219,8 @@ const entRec=id=>ent((RC||[]).find(y=>y.id===id));
 const altDest=x=>!!(x&&x.dv&&(['aprovado','concluido'].includes(x.dv.destino_status)||x.dv.entregue_em));
 const solDest=x=>!!(x&&x.dv&&x.dv.destino_status==='solicitado');
 // Trâmite de mudança de destino: tudo fica na 1ª movimentação. O registro técnico da entrega (guarda o link/QR e a confirmação) não é movimentação própria.
+const dvPend=x=>{if(!x||!x.d_status)return null;return{destino_status:x.d_status,local:x.d_local||'',para:x.d_para,motivo:x.d_motivo,solic_em:x.d_solic_em,solic_por:x.d_solic_por,decisao_em:x.d_decisao_em,decisao_por:x.d_decisao_por,decisao_obs:x.d_decisao_obs,entregue_em:x.d_entregue_em,entregue_por:x.d_entregue_por,receptor:x.d_receptor,obs:x.d_obs,foto:x.d_foto,token:x.d_token,conf_status:x.d_conf_status,conf_em:x.d_conf_em,conf_nome:x.d_conf_nome,conf_obs:x.d_conf_obs}};
+const dvMescla=(a,b)=>{if(!a&&!b)return null;const o={...(a||{})};Object.entries(b||{}).forEach(([k,v])=>{if(v!==null&&v!==undefined&&v!=='')o[k]=v});return o};
 const haTempo=d=>{if(!d)return'—';const m=Math.max(0,Math.round((Date.now()-new Date(d))/6e4));return m<60?m+' min':m<1440?Math.floor(m/60)+' h '+(m%60)+' min':Math.floor(m/1440)+' dia(s)'};
 const carDe=r=>{const t=r.destino_mov_token;return(D.mT||[]).find(c=>String(c.recolhimento_id)===String(r.id)||(t&&c.token_confirmacao===t))};
 const dvDe=r=>{if(!r||!r.destino_status)return null;const c=carDe(r)||{},lo=(D.l||[]).find(l=>String(l.id)===String(r.destino_local_id));
@@ -229,7 +231,7 @@ const rcPend=()=>(RC||[]).filter(x=>x.status==='pendente'&&!rcHid(x));
 const rcRec=()=>(RC||[]).filter(x=>x.status==='recolhido'&&!rcHid(x));
 let rcTab='pend';const rcGo=t=>{rcTab=t;if(me.papel==='logistica')logView();else render()};
 async function carregaRC(){if(RCbusy)return;RCbusy=true;
- try{const {data,error}=await sb.rpc('logistica_pendentes');if(error)throw error;RC=data||[];RCerr='';try{const {data:dv}=await sb.rpc('logistica_desvios');const mp=Object.fromEntries((dv||[]).map(d=>[d.id,d]));RC=RC.map(x=>({...x,dv:mp[x.id]||null}))}catch(_){}}catch(e){RC=[];RCerr=e.message||String(e)}
+ try{const {data,error}=await sb.rpc('logistica_pendentes');if(error)throw error;RC=data||[];RCerr='';try{const {data:dv}=await sb.rpc('logistica_desvios');const mp=Object.fromEntries((dv||[]).map(d=>[d.id,d]));RC=RC.map(x=>({...x,dv:dvMescla(dvPend(x),mp[x.id])}))}catch(_){RC=RC.map(x=>({...x,dv:dvPend(x)}))}}catch(e){RC=[];RCerr=e.message||String(e)}
  if(me&&me.papel==='logistica')RC=RC.filter(rcManter);
  RCbusy=false;if(me&&me.papel==='logistica')logView();else render()}
 function recolHtml(){
