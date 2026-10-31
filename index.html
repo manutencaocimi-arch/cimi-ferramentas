@@ -182,30 +182,31 @@ function cimiReceber(id){const rr=(D.rc||[]).find(r=>r.id===id),xr=(RC||[]).find
    else{b.disabled=false;er.textContent=data==='foto_obrigatoria'?'A foto é obrigatória.':data==='nao_recolhido'?'A Logística ainda não confirmou o recolhimento.':'Sem permissão para dar baixa.'}}
   catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}}
 function perfilAC(id){const u=AC.find(x=>x.id===id);
- form(`Perfil de acesso: ${esc(u.nome)}`,[{k:'papel',l:'Perfil',t:'select',value:u.papel==='logistica'?'logistica':u.papel==='executor'?'executor':'correlato',opts:[['correlato','Correlato — usa o sistema completo'],['logistica','🚚 Logística — vê somente os pedidos de recolhimento'],['executor','🛠️ Executor — vê só as ferramentas sob a sua guarda']]},pwField],'Salvar perfil',async v=>{
+ form(`Perfil de acesso: ${esc(loginDe(u))}`,[{k:'papel',l:'Perfil',t:'select',value:u.papel==='logistica'?'logistica':u.papel==='executor'?'executor':'correlato',opts:[['correlato','Correlato — usa o sistema completo'],['logistica','🚚 Logística — vê somente os pedidos de recolhimento'],['executor','🛠️ Executor — vê só as ferramentas sob a sua guarda']]},pwField],'Salvar perfil',async v=>{
   if(!await checkPw(v.senha))return'Senha incorreta.';
   const {data,error}=await sb.rpc('admin_definir_papel',{alvo:id,novo:v.papel});if(error)throw error;
   if(data!=='ok')return'Não foi possível alterar o perfil ('+data+').';
-  await logEdit('acessos',u.nome,[['perfil',u.papel,v.papel]]);AC=null;toast('Perfil atualizado ✔')})}
+  await logEdit('acessos',loginDe(u),[['perfil',u.papel,v.papel]]);AC=null;toast('Perfil atualizado ✔')})}
 let AC=null,ACerr='';
+const loginDe=u=>String(u.email||'').split('@')[0]||u.nome||'';
 async function carregaAC(){try{AC=(await api('listar')).usuarios;ACerr=''}catch(e){AC=[];ACerr=e.message}render()}
 function acessos(){if(AC===null){carregaAC();return'<p class="m">Carregando acessos…</p>'}
  const t=q.toLowerCase(),r=AC.filter(u=>`${u.nome} ${u.email}`.toLowerCase().includes(t));
  return`<div class="card m" style="margin-bottom:12px">🔒 Senhas que o <strong>próprio usuário</strong> escolheu ficam criptografadas e não podem ser vistas por ninguém, só redefinidas. Já a <strong>senha provisória</strong> (a que você define ou a enviada por e-mail) fica visível aqui até o usuário trocá-la.</div>
  <div class="bar"><input id="q" placeholder="🔎 Buscar usuário ou login..." value="${esc(q)}"><button class="btn o" onclick="AC=null;render()">↻ Atualizar</button><button class="btn" onclick="verUsuario(null)">📋 Relatório geral (todos)</button></div>
  <div class="tw"><table><tr><th>Usuário</th><th>Login</th><th>E-mail de recuperação</th><th>Papel</th><th>Senha</th><th>Último acesso</th><th>Ações</th></tr>
- ${r.map(u=>`<tr><td><a href="#" title="Ver acessos, movimentações e edições" onclick="verUsuario('${u.id}');return false" style="color:var(--gd);text-decoration:underline"><b>${esc(u.nome)}</b></a></td><td>${esc(u.email)}</td><td>${esc(u.email_contato||'—')}</td><td>${u.papel==='logistica'?'<span class="pill u">🚚 logística</span>':esc(u.papel)}</td>
+ ${r.map(u=>`<tr><td><a href="#" title="Ver acessos, movimentações e edições" onclick="verUsuario('${u.id}');return false" style="color:var(--gd);text-decoration:underline"><b title="${esc(u.nome||'')}">${esc(loginDe(u))}</b></a></td><td>${esc(u.email)}</td><td>${esc(u.email_contato||'—')}</td><td>${u.papel==='logistica'?'<span class="pill u">🚚 logística</span>':esc(u.papel)}</td>
  <td>${u.papel==='principal'?'—':u.senha_provisoria?`<span class="bd em_uso">Provisória</span> <button class="btn s o" onclick="verSenha('${u.id}')">👁 Ver</button>`:u.trocar_senha?'<span class="bd em_uso">Provisória</span><div class="m">não registrada</div>':'<span class="bd disponivel">Definida pelo usuário</span><div class="m">oculta (só dá para redefinir)</div>'}</td><td>${u.ultimo_acesso?fmt(u.ultimo_acesso):'nunca'}</td>
  <td class="acts"><button class="btn s y" onclick="novaSenha('${u.id}')">🔑 Nova senha</button><button class="btn s o" onclick="emailAC('${u.id}')">✉️ E-mail</button>${u.papel==='principal'?'':`<button class="btn s o" onclick="perfilAC('${u.id}')">🚚 Perfil</button>`}</td></tr>`).join('')||`<tr><td colspan=7 class="${ACerr?'err':'m'}">${ACerr?'Não foi possível carregar os usuários: '+esc(ACerr)+'. Confirme que a função "acessos" foi publicada no Supabase e clique em ↻ Atualizar.':'Nenhum usuário.'}</td></tr>`}</table></div>`}
 function novaSenha(id){const u=AC.find(x=>x.id===id),a='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
  const g=Array.from(crypto.getRandomValues(new Uint8Array(8)),b=>a[b%a.length]).join('');
- form(`Nova senha: ${esc(u.nome)}`,[{k:'nova',l:'Senha provisória (gerada automaticamente, pode editar)',value:g},
+ form(`Nova senha: ${esc(loginDe(u))}`,[{k:'nova',l:'Senha provisória (gerada automaticamente, pode editar)',value:g},
   {k:'enviar',l:'Enviar por e-mail ao usuário?',t:'select',value:u.email_contato?'1':'0',opts:[['1','Sim, para '+(u.email_contato||'(sem e-mail cadastrado)')],['0','Não, vou informar pessoalmente']]},
   {k:'minha',l:'🔒 Sua senha de administrador (confirmação)',t:'password'}],'Definir senha',async v=>{
   if(v.nova.length<6)return'Mínimo de 6 caracteres.';if(!await checkPw(v.minha))return'Sua senha está incorreta.';
   const r=await api('definir_senha',{id,senha:v.nova,enviar:v.enviar==='1'});AC=null;
-  alert(`Senha provisória de ${u.nome}:\n\n${v.nova}\n\nO usuário deverá trocá-la no próximo acesso.${r.aviso?'\n\n⚠️ '+r.aviso:''}`)})}
-function verSenha(id){const u=AC.find(x=>x.id===id);alert(`Senha provisória de ${u.nome}:\n\n${u.senha_provisoria}`)}
+  alert(`Senha provisória de ${loginDe(u)}:\n\n${v.nova}\n\nO usuário deverá trocá-la no próximo acesso.${r.aviso?'\n\n⚠️ '+r.aviso:''}`)})}
+function verSenha(id){const u=AC.find(x=>x.id===id);alert(`Senha provisória de ${loginDe(u)}:\n\n${u.senha_provisoria}`)}
 // ---------- Relatórios (PDF / Excel) ----------
 async function fetchAll(t,fn){let out=[],i=0;for(;;){let q=sb.from(t).select('*').order('created_at',{ascending:false}).range(i,i+999);if(fn)q=fn(q);const {data,error}=await q;if(error)throw error;out=out.concat(data||[]);if(!data||data.length<1000)break;i+=1000}return out}
 const dIni=s=>s?new Date(s+'T00:00:00'):null,dFim=s=>s?new Date(s+'T23:59:59.999'):null;
@@ -279,7 +280,7 @@ async function relMovGo(tipo,de,ate,locId,uso='todos'){let w=null;try{if(tipo===
  const a_=dIni(de),b_=dFim(ate),rows=movRows(all.filter(x=>noInt(x,a_,b_)&&(locId==='todos'||x.local_id===locId)&&usoOk(x,uso)),all),loc=locId==='todos'?'Todos os locais':L(locId)?.nome||'';
  baixar(tipo,'movimentacoes_'+slug(loc)+(uso==='todos'?'':'_'+slug(usoNome(uso)))+(de?'_de_'+de:'')+(ate?'_ate_'+ate:''),'Relatório de movimentações de ferramentas - CIMI',periodo(de,ate)+'  |  Local: '+loc+'  |  Tipo de uso: '+usoNome(uso),[{t:'Movimentações (retiradas e devoluções)',head:MOVH,rows}],w)}
  catch(e){if(w)w.close();toast('Erro: '+(e.message||e))}}
-async function verUsuario(id){const u=id?AC.find(x=>x.id===id):null,nm=u?u.nome:'Todos os usuários';
+async function verUsuario(id){const u=id?AC.find(x=>x.id===id):null,nm=u?loginDe(u):'Todos os usuários';
  const m=document.createElement('div');m.className='mask';m.addEventListener('click',e=>{if(e.target===m)m.remove()});
  m.innerHTML=`<div class="modal" style="max-width:min(1400px,96vw)"><h3>${u?'👤':'📋'} ${esc(nm)}</h3><div class="m">${u?esc(u.email)+' · '+esc(u.papel)+' · último acesso: '+(u.ultimo_acesso?fmt(u.ultimo_acesso):'nunca'):'Relatório geral: acessos, movimentações e edições de todos os usuários'}</div>
  <div class="bar" style="margin-top:12px;align-items:flex-end"><div><label>De</label><input type="date" id="rd1" style="width:auto"></div><div><label>Até</label><input type="date" id="rd2" style="width:auto"></div>
@@ -297,7 +298,7 @@ async function verUsuario(id){const u=id?AC.find(x=>x.id===id):null,nm=u?u.nome:
   bl.map(b=>`<h4 style="margin:16px 0 6px">${b.t} (${b.rows.length})</h4>${b.rows.length?`<div class="tw" style="max-height:340px"><table><tr>${b.head.map(h=>`<th>${h}</th>`).join('')}</tr>${b.rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table></div>`:'<p class="m">Nenhum registro no período.</p>'}`).join('')};
  const baixa=t=>{let w=null;try{if(t==='print'){w=window.open('','_blank');if(!w)return toast('O navegador bloqueou a janela de impressão. Permita pop-ups para este site.')}const d1=m.querySelector('#rd1').value,d2=m.querySelector('#rd2').value;baixar(t,'relatorio_'+slug(nm)+(d1?'_de_'+d1:'')+(d2?'_ate_'+d2:''),'Relatório de usuário - '+nm,periodo(d1,d2),blocos(),w)}catch(e){if(w)w.close();toast('Erro: '+(e.message||e))}};
  m.querySelector('#rd1').onchange=m.querySelector('#rd2').onchange=show;m.querySelector('#rprt').onclick=()=>baixa('print');m.querySelector('#rpdf').onclick=()=>baixa('pdf');m.querySelector('#rxls').onclick=()=>baixa('xlsx');show()}
-function emailAC(id){const u=AC.find(x=>x.id===id);form(`E-mail de recuperação: ${esc(u.nome)}`,[{k:'email',l:'E-mail',t:'email',value:u.email_contato}],'Salvar',async v=>{
+function emailAC(id){const u=AC.find(x=>x.id===id);form(`E-mail de recuperação: ${esc(loginDe(u))}`,[{k:'email',l:'E-mail',t:'email',value:u.email_contato}],'Salvar',async v=>{
  await api('definir_email',{id,email:v.email});AC=null;toast('E-mail salvo ✔')})}
 
 // ---------- Login ----------
