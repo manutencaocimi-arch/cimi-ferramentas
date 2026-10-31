@@ -219,6 +219,7 @@ const entRec=id=>ent((RC||[]).find(y=>y.id===id));
 const altDest=x=>!!(x&&x.dv&&(['aprovado','concluido'].includes(x.dv.destino_status)||x.dv.entregue_em));
 const solDest=x=>!!(x&&x.dv&&x.dv.destino_status==='solicitado');
 // Trâmite de mudança de destino: tudo fica na 1ª movimentação. O registro técnico da entrega (guarda o link/QR e a confirmação) não é movimentação própria.
+const haTempo=d=>{if(!d)return'—';const m=Math.max(0,Math.round((Date.now()-new Date(d))/6e4));return m<60?m+' min':m<1440?Math.floor(m/60)+' h '+(m%60)+' min':Math.floor(m/1440)+' dia(s)'};
 const carDe=r=>{const t=r.destino_mov_token;return(D.mT||[]).find(c=>String(c.recolhimento_id)===String(r.id)||(t&&c.token_confirmacao===t))};
 const dvDe=r=>{if(!r||!r.destino_status)return null;const c=carDe(r)||{},lo=(D.l||[]).find(l=>String(l.id)===String(r.destino_local_id));
  return{destino_status:r.destino_status,local:lo?lo.nome:'',para:r.destino_para,motivo:r.destino_motivo,solic_em:r.destino_solic_em,solic_por:r.destino_solic_por,decisao_em:r.destino_decisao_em,decisao_por:r.destino_decisao_por,decisao_obs:r.destino_decisao_obs,entregue_em:r.destino_entregue_em,entregue_por:r.destino_entregue_por,receptor:r.destino_receptor,obs:r.destino_obs,foto:r.destino_foto,token:r.destino_mov_token,conf_status:c.conf_status,conf_em:c.conf_em,conf_nome:c.conf_nome,conf_obs:c.conf_obs}};
@@ -255,7 +256,7 @@ function recolHtml(){
   const andL=RC.filter(x=>x.status==='recolhido'||(x.status==='concluido'&&x.dv&&x.dv.entregue_em&&x.dv.token&&x.dv.conf_status!=='confirmada')).sort((a,b)=>new Date(b.recolhido_em||b.quando||0)-new Date(a.recolhido_em||a.quando||0));
   const andRow=x=>{const ea=ent(x),sd=solDest(x),fim=x.status==='concluido',dv=x.dv||{};let com,dest,st,desde,ft;
    if(fim){com=`👷 ${esc(dv.receptor||dv.para||'—')} <span class="m">(no destino)</span>`;dest=`📍 ${esc(dv.local||'—')}`;desde=dv.entregue_em;ft=dv.foto;
-    st=dv.conf_status==='contestada'?`<span class="bd baixa">⚠ Divergência informada</span><div class="m">${esc(dv.conf_obs||'')}</div>`:`<span class="bd em_uso">⏳ Entregue — aguardando confirmação de ${esc(dv.receptor||'recebimento')}</span><div class="m">Levado por ${esc(dv.entregue_por||'—')}</div>`}
+    st=dv.conf_status==='contestada'?`<span class="bd baixa">⚠ Divergência informada</span><div class="m">${esc(dv.conf_obs||'')}</div>`:`<span class="bd baixa">⚠ NÃO CONFIRMADO — ${esc(dv.receptor||'o destinatário')} ainda não confirmou o recebimento</span><div class="m" style="color:#c0392b;font-weight:700">Sem confirmação há ${haTempo(dv.entregue_em)} · cobrar ${esc(dv.receptor||'o destinatário')} (ou a Logística, se não entregou)</div><div class="m">Entregue por ${esc(dv.entregue_por||'—')} em ${dv.entregue_em?fmt(dv.entregue_em):'—'}</div>`}
    else{com=`🚚 ${esc(x.recolhido_por||'Logística')} <span class="m">(Logística)</span>`;desde=x.recolhido_em;ft=x.foto;
     dest=ea?`📍 ${esc(dv.local||'—')}<div class="m">para ${esc(dv.para||'—')}</div>`:sd?'🔀 A definir <span class="m">(aprovação pendente)</span>':'🏢 CIMI';
     st=ea?'<span class="bd em_uso">🚚 A caminho do destino autorizado</span>':sd?'<span class="bd em_uso">⏳ Retirado — aguardando aprovação do destino</span>':'<span class="bd em_uso">🚚 A caminho do CIMI — aguardando recebimento</span>'}
