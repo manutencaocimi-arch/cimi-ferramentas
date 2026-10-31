@@ -104,19 +104,93 @@ function dataMov(id){const m=D.m.find(x=>x.id===id),d=new Date(m.created_at),loc
 // ---------- Recolhimento de material (Logística) ----------
 let RC=null,RCerr='',RCbusy=false;
 // Logística: oculta só os registros antigos (exceto este); pedidos criados a partir de 30/10/2026 17:00 continuam aparecendo
+// ---------- Cargos e mudança de destino (demanda extraordinária) ----------
+let CG={};
+const meCargo=()=>CG[me.id]?.cargo||'';
+const podeAprovar=()=>me.papel==='principal'||['ADM','Coordenador','Supervisor'].includes(meCargo());
+const cargoTag=u=>CG[u.id]?`<span class="pill u">${esc(CG[u.id].cargo)}</span>`:'—';
+const CARGOS=['ADM','Coordenador','Supervisor','Assistente/Encarregado','Jovem Aprendiz'];
+function cargoAC(id){const u=AC.find(x=>x.id===id);if(!u)return;
+ form(`Cargo: ${esc(loginDe(u))}`,[{k:'cargo',l:'Cargo (ADM, Coordenador e Supervisor aprovam mudança de destino)',t:'select',value:CG[id]?.cargo||'',opts:[['','— Sem cargo —'],...CARGOS.map(c=>[c,c])]},
+  {k:'ordem',l:'Posição na lista de acessos (1 = primeiro)',value:CG[id]?.ordem??''},pwField],'Salvar cargo',async v=>{
+  if(!await checkPw(v.senha))return'Senha incorreta.';
+  const {data,error}=await sb.rpc('admin_definir_cargo',{alvo:id,novo:v.cargo,nova_ordem:parseInt(v.ordem)||999});if(error)throw error;
+  if(data!=='ok')return'Não foi possível salvar o cargo ('+data+').';
+  await logEdit('acessos',loginDe(u),[['cargo',CG[id]?.cargo||'—',v.cargo||'—']]);await load();AC=null;toast('Cargo atualizado ✔')})}
+const dvBox=(h,cor='var(--o)',bg='#fff4e5')=>`<div style="margin-top:10px;padding:10px;border-radius:8px;background:${bg};border:1px solid ${cor}">${h}</div>`;
+function cardDv(h,x,cm){const dv=x.dv,pode=['logistica','principal'].includes(me.papel),ativo=['pendente','recolhido'].includes(x.status);let b='';
+ if(dv&&dv.destino_status==='aprovado'&&x.status!=='concluido'){
+  h=h.replace(/<button class="btn"[^>]*cimiReceber\('[^']*'\)">[^<]*<\/button>/,'').replace('LEVAR AO CIMI (o CIMI confirma o recebimento)','LEVAR AO DESTINO AUTORIZADO').replace('AGUARDANDO RECEBIMENTO NO CIMI','DESTINO ALTERNATIVO AUTORIZADO').replace(/⏳ Entregue o material no CIMI\. A baixa só é dada quando o CIMI confirmar o recebimento\./,'⏳ Leve o material ao destino autorizado e envie a foto da entrega.')}
+ if(dv&&dv.destino_status==='concluido'||x.status==='concluido'&&dv&&dv.entregue_em){
+  h=h.replace('✔ RECEBIDO NO CIMI','✔ ENTREGUE NO DESTINO AUTORIZADO').replace(/<div class="m" style="margin-top:8px">📥 Recebido no CIMI por [\s\S]*?<\/div>/,'')}
+ if(dv&&dv.destino_status==='solicitado'){
+  b=dvBox(`<div style="font-weight:700">🔀 Mudança de destino — aguardando aprovação</div><div>📍 Levar para: <strong>${esc(dv.local||'—')}</strong></div><div class="m">Pedido por ${esc(dv.solic_por||'—')} · ${dv.solic_em?fmt(dv.solic_em):''}</div><div>💬 ${esc(dv.motivo||'')}</div>`+
+   (podeAprovar()?`<div class="acts" style="margin-top:10px"><button class="btn" style="flex:1" onclick="desvioDecidir('${x.id}',true)">✔ Aprovar</button><button class="btn r" style="flex:1" onclick="desvioDecidir('${x.id}',false)">✖ Negar</button></div>`:'<div class="m" style="margin-top:6px">Só Supervisor, Coordenador ou ADM podem aprovar.</div>'))}
+ else if(dv&&dv.destino_status==='aprovado'){
+  b=dvBox(`<div style="font-weight:700;color:var(--gd)">✔ Destino alternativo AUTORIZADO</div><div>📍 Levar para: <strong>${esc(dv.local||'—')}</strong></div><div class="m">Aprovado por ${esc(dv.decisao_por||'—')} · ${dv.decisao_em?fmt(dv.decisao_em):''}${dv.decisao_obs?' · '+esc(dv.decisao_obs):''}</div><div>💬 ${esc(dv.motivo||'')}</div>`+
+   (x.status==='recolhido'&&pode?`<button class="btn" style="width:100%;margin-top:10px;padding:14px;font-size:16px" onclick="desvioEntregar('${x.id}')">📍 Entreguei no destino — enviar foto</button>`:'')+
+   (x.status==='pendente'&&pode?'<div class="m" style="margin-top:6px">Primeiro recolha o material (botão acima); depois leve ao destino autorizado.</div>':''),'var(--g)','#e9f7ee')}
+ else if(dv&&dv.destino_status==='negado'){b=dvBox(`<div style="font-weight:700;color:var(--r,#c0392b)">✖ Mudança de destino NEGADA — segue para o CIMI</div><div class="m">${esc(dv.decisao_por||'—')} · ${dv.decisao_em?fmt(dv.decisao_em):''}</div><div>💬 ${esc(dv.decisao_obs||'')}</div>`,'#c0392b','#fdecea')}
+ if(dv&&dv.entregue_em){b+=dvBox(`<div style="font-weight:700">📍 Entregue em ${esc(dv.local||'—')}</div><div class="m">Levado por ${esc(dv.entregue_por||'—')} · recebido por <strong>${esc(dv.receptor||'—')}</strong> · ${fmt(dv.entregue_em)}</div>${dv.obs?`<div>💬 ${esc(dv.obs)}</div>`:''}${dv.foto?`<img src="${esc(dv.foto)}" style="max-width:200px;max-height:200px;border-radius:8px;cursor:pointer;margin-top:8px;border:1px solid var(--b)" onclick="foto('${esc(dv.foto)}')">`:''}`,'var(--g)','#e9f7ee')}
+ if((!dv||dv.destino_status==='negado')&&ativo&&pode)b+=`<button class="btn o" style="width:100%;margin-top:10px;padding:12px" onclick="desvioPedir('${x.id}')">🔀 Mudar destino (urgência) — precisa de aprovação</button>`;
+ return h.replace(/<\/div>\s*$/,b+'</div>')}
+const mkModal=html=>{const m=document.createElement('div');m.className='mask';m.innerHTML=`<div class="modal">${html}</div>`;document.body.appendChild(m);return m};
+const dvMsg={sem_permissao:'Sem permissão para esta ação.',motivo:'Explique o motivo da urgência (mín. 5 letras).',status_invalido:'Este pedido não está mais ativo.',ja_existe:'Já existe um pedido de mudança de destino para este material.',local_invalido:'Escolha o local de destino.',ja_decidido:'Este pedido já foi decidido por outra pessoa.',obs_obrigatoria:'Para negar, explique o motivo.',sem_aprovacao:'A mudança de destino ainda não foi aprovada.',nao_recolhido:'Confirme primeiro o recolhimento.',foto_obrigatoria:'A foto é obrigatória.',receptor:'Informe o nome de quem recebeu no destino.'};
+const dvRefresh=async()=>{await carregaRC();if(me.papel!=='logistica'){await load();render()}};
+async function desvioPedir(id){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
+ const {data:ls,error:le}=await sb.rpc('logistica_locais');if(le)return toast('Erro: '+le.message);
+ const gr={};(ls||[]).forEach(l=>{const g=l.grupo||'Outros';(gr[g]=gr[g]||[]).push(l)});
+ const ops=Object.entries(gr).map(([g,a])=>`<optgroup label="${esc(g)}">${a.map(l=>`<option value="${esc(l.id)}">${esc(l.nome)}</option>`).join('')}</optgroup>`).join('');
+ const m=mkModal(`<h3>🔀 Mudar destino (demanda extraordinária)</h3><div><strong>${esc(x.ferramenta)}</strong><div class="m">Hoje o destino é o CIMI. A mudança só vale depois de aprovada por Supervisor, Coordenador ou ADM.</div></div>
+ <label>Levar para o local</label><select id="dl"><option value="">— escolha o local —</option>${ops}</select>
+ <label>Motivo da urgência (obrigatório)</label><textarea id="dm" rows="3"></textarea><div class="err" id="de"></div>
+ <div class="acts" style="margin-top:14px"><button class="btn" id="dok" style="flex:1;padding:12px">Enviar para aprovação</button><button class="btn o" id="dno">Cancelar</button></div>`);
+ m.querySelector('#dno').onclick=()=>m.remove();
+ m.querySelector('#dok').onclick=async e=>{const b=e.target,er=m.querySelector('#de'),loc=m.querySelector('#dl').value,mo=m.querySelector('#dm').value.trim();er.textContent='';
+  if(!loc)return er.textContent='Escolha o local de destino.';if(mo.length<5)return er.textContent='Explique o motivo da urgência.';
+  b.disabled=true;try{const {data,error}=await sb.rpc('desvio_solicitar',{p_id:id,p_local:loc,p_motivo:mo});if(error)throw error;
+   if(data==='ok'){m.remove();toast('Pedido enviado para aprovação ✔');await dvRefresh()}else{b.disabled=false;er.textContent=dvMsg[data]||'Não foi possível enviar ('+data+').'}}
+  catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}}
+function desvioDecidir(id,ap){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
+ const m=mkModal(`<h3>${ap?'✔ Aprovar':'✖ Negar'} mudança de destino</h3><div><strong>${esc(x.ferramenta)}</strong><div>📍 ${esc(x.dv?.local||'—')}</div><div class="m">${esc(x.dv?.motivo||'')}</div></div>
+ <label>Observação ${ap?'(opcional)':'(obrigatória ao negar)'}</label><textarea id="do" rows="2"></textarea><div class="err" id="de"></div>
+ <div class="acts" style="margin-top:14px"><button class="btn ${ap?'':'r'}" id="dok" style="flex:1;padding:12px">${ap?'Confirmar aprovação':'Confirmar negativa'}</button><button class="btn o" id="dno">Cancelar</button></div>`);
+ m.querySelector('#dno').onclick=()=>m.remove();
+ m.querySelector('#dok').onclick=async e=>{const b=e.target,er=m.querySelector('#de'),ob=m.querySelector('#do').value.trim();er.textContent='';
+  if(!ap&&ob.length<3)return er.textContent='Para negar, explique o motivo.';
+  b.disabled=true;try{const {data,error}=await sb.rpc('desvio_decidir',{p_id:id,p_aprovar:ap,p_obs:ob});if(error)throw error;
+   if(data==='ok'){m.remove();toast(ap?'Mudança de destino aprovada ✔':'Mudança de destino negada');await dvRefresh()}else{b.disabled=false;er.textContent=dvMsg[data]||'Não foi possível concluir ('+data+').'}}
+  catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}}
+function desvioEntregar(id){const x=(RC||[]).find(r=>r.id===id);if(!x||!x.dv)return;
+ const m=mkModal(`<h3>📍 Entrega no destino autorizado</h3><div><strong>${esc(x.ferramenta)}</strong><div>📍 ${esc(x.dv.local||'—')}</div><div class="m">Aprovado por ${esc(x.dv.decisao_por||'—')}</div></div>
+ <label>Quem recebeu no local (nome completo)</label><input id="dr">
+ <label>Foto da entrega (obrigatória)</label><input type="file" id="df" accept="image/*" capture="environment"><div id="dp" style="margin:8px 0"></div>
+ <label>Observação (opcional)</label><textarea id="do" rows="2"></textarea><div class="err" id="de"></div>
+ <div class="acts" style="margin-top:14px"><button class="btn" id="dok" style="flex:1;padding:12px">✔ Confirmar entrega</button><button class="btn o" id="dno">Cancelar</button></div>`);
+ m.querySelector('#dno').onclick=()=>m.remove();
+ m.querySelector('#df').onchange=e=>{const f=e.target.files[0];m.querySelector('#dp').innerHTML=f?`<img src="${URL.createObjectURL(f)}" style="max-width:100%;max-height:240px;border-radius:10px">`:''};
+ m.querySelector('#dok').onclick=async e=>{const b=e.target,er=m.querySelector('#de'),rc=m.querySelector('#dr').value.trim(),fl=m.querySelector('#df').files[0],ob=m.querySelector('#do').value.trim();er.textContent='';
+  if(rc.length<3)return er.textContent='Informe o nome de quem recebeu.';if(!fl)return er.textContent='Tire a foto da entrega.';
+  b.disabled=true;er.textContent='Enviando…';
+  try{const bl=await shrink(fl),pa=`recolhimentos/${id}/destino-${Date.now()}.jpg`;
+   const {error:ue}=await sb.storage.from('fotos').upload(pa,bl,{contentType:'image/jpeg'});if(ue)throw ue;
+   const url=sb.storage.from('fotos').getPublicUrl(pa).data.publicUrl;
+   const {data,error}=await sb.rpc('desvio_entregar',{p_id:id,p_foto:url,p_receptor:rc,p_obs:ob});if(error)throw error;
+   if(data==='ok'){m.remove();toast('Entrega registrada ✔');await dvRefresh()}else{b.disabled=false;er.textContent=dvMsg[data]||'Não foi possível registrar ('+data+').'}}
+  catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}}
 const rcManter=x=>x.status==='concluido'&&String(x.ferramenta||'').toUpperCase()==='CARRINHO DE MÃO'&&String(x.solicitante||'').trim().toLowerCase()==='davson rocha silva'||new Date(x.quando)>new Date('2026-10-30T20:00:00Z');
 const rcPend=()=>(RC||[]).filter(x=>x.status==='pendente');
 const rcRec=()=>(RC||[]).filter(x=>x.status==='recolhido');
 let rcTab='pend';const rcGo=t=>{rcTab=t;if(me.papel==='logistica')logView();else render()};
 async function carregaRC(){if(RCbusy)return;RCbusy=true;
- try{const {data,error}=await sb.rpc('logistica_pendentes');if(error)throw error;RC=data||[];RCerr=''}catch(e){RC=[];RCerr=e.message||String(e)}
+ try{const {data,error}=await sb.rpc('logistica_pendentes');if(error)throw error;RC=data||[];RCerr='';try{const {data:dv}=await sb.rpc('logistica_desvios');const mp=Object.fromEntries((dv||[]).map(d=>[d.id,d]));RC=RC.map(x=>({...x,dv:mp[x.id]||null}))}catch(_){}}catch(e){RC=[];RCerr=e.message||String(e)}
  if(me&&me.papel==='logistica')RC=RC.filter(rcManter);
  RCbusy=false;if(me&&me.papel==='logistica')logView();else render()}
 function recolHtml(){
  if(RC===null){carregaRC();return'<p class="m">Carregando pedidos…</p>'}
  const cm=me.papel!=='logistica',pode=['logistica','principal'].includes(me.papel),p=rcPend(),tr=rcRec(),ok=RC.filter(x=>x.status==='concluido');
  const bt=(u,l)=>u?`<div style="margin-top:8px"><div class="m">${l}</div><img src="${esc(u)}" style="max-width:200px;max-height:200px;border-radius:8px;cursor:pointer;border:1px solid var(--b)" onclick="foto('${esc(u)}')"></div>`:'';
- const card=x=>{const pe=x.status==='pendente',tra=x.status==='recolhido',cor=pe?'var(--o)':tra?'var(--bl)':'var(--g)',
+ const card0=x=>{const pe=x.status==='pendente',tra=x.status==='recolhido',cor=pe?'var(--o)':tra?'var(--bl)':'var(--g)',
   tit=pe?'🔔 RECOLHER MATERIAL':tra?(cm?'🚚 RECOLHIDO PELA LOGÍSTICA · AGUARDANDO RECEBIMENTO NO CIMI':'🚚 RECOLHIDO · LEVAR AO CIMI (o CIMI confirma o recebimento)'):'✔ RECEBIDO NO CIMI';
   return`<div class="card" style="margin-bottom:12px;border-left:6px solid ${cor}">
   <div style="font-size:12px;font-weight:700;color:${cor}">${tit}</div>
@@ -132,12 +206,15 @@ function recolHtml(){
   ${pe&&!pode?'<div class="m" style="margin-top:8px">⏳ Aguardando a Logística recolher.</div>':''}
   ${tra&&cm?`<button class="btn" style="width:100%;margin-top:12px;padding:14px;font-size:16px" onclick="cimiReceber('${x.id}')">📥 Recebi no CIMI — enviar foto e dar baixa</button>`:''}
   ${tra&&!cm?'<div class="m" style="margin-top:8px">⏳ Entregue o material no CIMI. A baixa só é dada quando o CIMI confirmar o recebimento.</div>':''}</div>`};
+ const card=x=>cardDv(card0(x),x,cm);
  const partes=[];if(p.length)partes.push(`🔔 ${p.length} pedido${p.length>1?'s':''} de recolhimento`);if(tr.length)partes.push(cm?`📥 ${tr.length} para o CIMI receber`:`🚚 ${tr.length} aguardando recebimento do CIMI`);
- const alerta=p.length>0||(cm&&tr.length>0);
+ const dvp=cm&&podeAprovar()?(RC||[]).filter(x=>x.dv&&x.dv.destino_status==='solicitado'):[];if(dvp.length)partes.unshift(`🔀 ${dvp.length} mudança${dvp.length>1?'s':''} de destino para aprovar`);
+ const secDv=dvp.length?`<h3 style="margin:4px 0 8px">🔀 Demandas extraordinárias — aguardando sua aprovação</h3>${dvp.map(card).join('')}`:'';
+ const alerta=p.length>0||(cm&&tr.length>0)||dvp.length>0;
  return`${RCerr?`<p class="err">Não foi possível carregar os pedidos: ${esc(RCerr)}</p>`:''}
  <div class="card" style="margin-bottom:14px;background:${alerta?'#fff4e5':'#e9f7ee'};border-color:${alerta?'var(--o)':'var(--g)'};display:flex;align-items:center;gap:10px;flex-wrap:wrap">
   <strong style="font-size:18px;flex:1">${partes.length?partes.join(' · '):'✔ Nenhum pedido pendente'}</strong><button class="btn o" onclick="carregaRC()">↻ Atualizar</button></div>
- <div class="acts" style="margin-bottom:14px">
+ ${secDv}<div class="acts" style="margin-bottom:14px">
   <button class="btn ${rcTab==='pend'?'':'o'}" style="flex:1;padding:12px" onclick="rcGo('pend')">🔔 Solicitações pendentes (${p.length})</button>
   <button class="btn ${rcTab==='rec'?'':'o'}" style="flex:1;padding:12px" onclick="rcGo('rec')">🚚 Recolhidos (${tr.length+ok.length})</button></div>
  ${rcTab==='pend'?(p.length?p.map(card).join(''):'<p class="m">Nenhuma solicitação pendente.</p>')
@@ -191,13 +268,13 @@ let AC=null,ACerr='';
 const loginDe=u=>String(u.email||'').split('@')[0]||u.nome||'';
 async function carregaAC(){try{AC=(await api('listar')).usuarios;ACerr=''}catch(e){AC=[];ACerr=e.message}render()}
 function acessos(){if(AC===null){carregaAC();return'<p class="m">Carregando acessos…</p>'}
- const t=q.toLowerCase(),r=AC.filter(u=>`${u.nome} ${u.email}`.toLowerCase().includes(t));
+ const t=q.toLowerCase(),r=AC.filter(u=>`${u.nome} ${u.email}`.toLowerCase().includes(t)).sort((a,b)=>(CG[a.id]?.ordem??9999)-(CG[b.id]?.ordem??9999));
  return`<div class="card m" style="margin-bottom:12px">🔒 Senhas que o <strong>próprio usuário</strong> escolheu ficam criptografadas e não podem ser vistas por ninguém, só redefinidas. Já a <strong>senha provisória</strong> (a que você define ou a enviada por e-mail) fica visível aqui até o usuário trocá-la.</div>
  <div class="bar"><input id="q" placeholder="🔎 Buscar usuário ou login..." value="${esc(q)}"><button class="btn o" onclick="AC=null;render()">↻ Atualizar</button><button class="btn" onclick="verUsuario(null)">📋 Relatório geral (todos)</button></div>
- <div class="tw"><table><tr><th>Usuário</th><th>Login</th><th>E-mail de recuperação</th><th>Papel</th><th>Senha</th><th>Último acesso</th><th>Ações</th></tr>
- ${r.map(u=>`<tr><td><a href="#" title="Ver acessos, movimentações e edições" onclick="verUsuario('${u.id}');return false" style="color:var(--gd);text-decoration:underline"><b title="${esc(u.nome||'')}">${esc(loginDe(u))}</b></a></td><td>${esc(u.email)}</td><td>${esc(u.email_contato||'—')}</td><td>${u.papel==='logistica'?'<span class="pill u">🚚 logística</span>':esc(u.papel)}</td>
+ <div class="tw"><table><tr><th>Usuário</th><th>Login</th><th>E-mail de recuperação</th><th>Cargo</th><th>Papel</th><th>Senha</th><th>Último acesso</th><th>Ações</th></tr>
+ ${r.map(u=>`<tr><td><a href="#" title="Ver acessos, movimentações e edições" onclick="verUsuario('${u.id}');return false" style="color:var(--gd);text-decoration:underline"><b title="${esc(u.nome||'')}">${esc(loginDe(u))}</b></a></td><td>${esc(u.email)}</td><td>${esc(u.email_contato||'—')}</td><td>${cargoTag(u)}</td><td>${u.papel==='logistica'?'<span class="pill u">🚚 logística</span>':esc(u.papel)}</td>
  <td>${u.papel==='principal'?'—':u.senha_provisoria?`<span class="bd em_uso">Provisória</span> <button class="btn s o" onclick="verSenha('${u.id}')">👁 Ver</button>`:u.trocar_senha?'<span class="bd em_uso">Provisória</span><div class="m">não registrada</div>':'<span class="bd disponivel">Definida pelo usuário</span><div class="m">oculta (só dá para redefinir)</div>'}</td><td>${u.ultimo_acesso?fmt(u.ultimo_acesso):'nunca'}</td>
- <td class="acts"><button class="btn s y" onclick="novaSenha('${u.id}')">🔑 Nova senha</button><button class="btn s o" onclick="emailAC('${u.id}')">✉️ E-mail</button>${u.papel==='principal'?'':`<button class="btn s r" title="Volta para a senha inicial 123456 e pede nova senha no próximo acesso" onclick="resetSenha('${u.id}')">↺ Resetar senha</button><button class="btn s o" onclick="perfilAC('${u.id}')">🚚 Perfil</button>`}</td></tr>`).join('')||`<tr><td colspan=7 class="${ACerr?'err':'m'}">${ACerr?'Não foi possível carregar os usuários: '+esc(ACerr)+'. Confirme que a função "acessos" foi publicada no Supabase e clique em ↻ Atualizar.':'Nenhum usuário.'}</td></tr>`}</table></div>`}
+ <td class="acts"><button class="btn s y" onclick="novaSenha('${u.id}')">🔑 Nova senha</button><button class="btn s o" onclick="emailAC('${u.id}')">✉️ E-mail</button><button class="btn s o" onclick="cargoAC('${u.id}')">🏷️ Cargo</button>${u.papel==='principal'?'':`<button class="btn s r" title="Volta para a senha inicial 123456 e pede nova senha no próximo acesso" onclick="resetSenha('${u.id}')">↺ Resetar senha</button><button class="btn s o" onclick="perfilAC('${u.id}')">🚚 Perfil</button>`}</td></tr>`).join('')||`<tr><td colspan=8 class="${ACerr?'err':'m'}">${ACerr?'Não foi possível carregar os usuários: '+esc(ACerr)+'. Confirme que a função "acessos" foi publicada no Supabase e clique em ↻ Atualizar.':'Nenhum usuário.'}</td></tr>`}</table></div>`}
 function novaSenha(id){const u=AC.find(x=>x.id===id),a='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
  const g=Array.from(crypto.getRandomValues(new Uint8Array(8)),b=>a[b%a.length]).join('');
  form(`Nova senha: ${esc(loginDe(u))}`,[{k:'nova',l:'Senha provisória (gerada automaticamente, pode editar)',value:g},
@@ -433,9 +510,9 @@ async function start(){
  await load(); render();carregaRC();
  sb.channel('rt').on('postgres_changes',{event:'*',schema:'public'},async()=>{await load();render();carregaRC()}).subscribe()}
 async function load(){
- const [f,l,m,e,pe,fu,rc]=await Promise.all([sb.from('ferramentas').select('*').order('nome'),sb.from('locais').select('*').order('nome'),
-  sb.from('movimentacoes').select('*').order('created_at',{ascending:false}).limit(500),sb.from('edicoes').select('*').order('created_at',{ascending:false}).limit(300),sb.from('pessoas').select('*').order('nome'),sb.from('funcoes').select('*').order('nome'),sb.from('recolhimentos').select('*').order('created_at',{ascending:false}).limit(500)]);
- D={f:f.data||[],l:l.data||[],m:m.data||[],e:e.data||[],p:pe.data||[],fn:fu.data||[],rc:rc.data||[]}}
+ const [f,l,m,e,pe,fu,rc,cg]=await Promise.all([sb.from('ferramentas').select('*').order('nome'),sb.from('locais').select('*').order('nome'),
+  sb.from('movimentacoes').select('*').order('created_at',{ascending:false}).limit(500),sb.from('edicoes').select('*').order('created_at',{ascending:false}).limit(300),sb.from('pessoas').select('*').order('nome'),sb.from('funcoes').select('*').order('nome'),sb.from('recolhimentos').select('*').order('created_at',{ascending:false}).limit(500),sb.from('cargos').select('*')]);
+ D={f:f.data||[],l:l.data||[],m:m.data||[],e:e.data||[],p:pe.data||[],fn:fu.data||[],rc:rc.data||[]};CG=Object.fromEntries((cg.data||[]).map(r=>[r.user_id,r]))}
 
 // ---------- Modal / formulário genérico ----------
 function form(title,fields,okLabel,onSubmit){
@@ -571,7 +648,7 @@ const act=(fn,id,arr)=>fn(arr.find(x=>x.id===id));
 // ---------- Telas ----------
 function render(){
  const tabs=[['painel','🧰 Ferramentas'],['hist','🕘 Movimentações'],['locais','📍 Locais'],['pessoas','👷 Pessoas'],['funcoes','🏷️ Funções'],['edic','✏️ Edições']];{const nr=rcPend().length+rcRec().length;tabs.push(['recol','🚚 Recolhimentos'+(nr?' <span class="pill u">'+nr+'</span>':'')])}if(me.papel==='principal')tabs.push(['acessos','🔑 Acessos']);
- $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas</h1><small>${esc(me.nome)} (${me.papel==='principal'?'principal':'correlato'})</small><button class="btn o s" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></header>
+ $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas</h1><small>${esc(me.nome)} (${meCargo()||(me.papel==='principal'?'principal':'correlato')})</small><button class="btn o s" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></header>
  <nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';q='';render()">${t[1]}</button>`).join('')}</nav><main>${{painel,hist:histView,locais,pessoas,funcoes,edic,acessos,recol:recolHtml}[tab]()}</main>`;
  const s=$('#q');if(s){s.oninput=e=>{q=e.target.value;const p=e.target.selectionStart;render();const n=$('#q');n.focus();n.setSelectionRange(p,p)}}}
 const recAtiva=fid=>(D.rc||[]).find(r=>r.ferramenta_id===fid&&(r.status==='pendente'||r.status==='recolhido'));
