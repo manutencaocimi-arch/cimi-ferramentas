@@ -161,7 +161,7 @@ async function desvioPedir(id){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
 function desvioDecidir(id,ap){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
  const m=mkModal(`<h3>${ap?'✔ Aprovar':'✖ Negar'} mudança de destino</h3><div><strong>${esc(x.ferramenta)}</strong><div>📍 ${esc(x.dv?.local||'—')}</div><div>👷 Para: <strong>${esc(x.dv?.para||'—')}</strong></div><div class="m">${esc(x.dv?.motivo||'')}</div></div>
  <label>Observação ${ap?'(opcional)':'(obrigatória ao negar)'}</label><textarea id="do" rows="2"></textarea>
- <label>🔒 Sua senha de acesso (obrigatória para ${ap?'aprovar':'negar'})</label><input type="password" id="dpw" name="conf-aprov-${Date.now()}" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')" placeholder="Digite sua senha"><div class="err" id="de"></div>
+ <label>🔒 Sua senha de acesso (obrigatória para ${ap?'aprovar':'negar'})</label><input type="password" id="dpw" name="conf-aprov-${Date.now()}" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')" placeholder="Digite sua senha"><div class="err" id="de"></div><div class="m" style="font-size:11px;margin-top:6px">Confirmação de senha · versão 2</div>
  <div class="acts" style="margin-top:14px"><button class="btn ${ap?'':'r'}" id="dok" style="flex:1;padding:12px">${ap?'Confirmar aprovação':'Confirmar negativa'}</button><button class="btn o" id="dno">Cancelar</button></div>`);
  m.querySelector('#dno').onclick=()=>m.remove();
  m.querySelector('#dok').onclick=async e=>{const b=e.target,er=m.querySelector('#de'),ob=m.querySelector('#do').value.trim();er.textContent='';
@@ -170,7 +170,7 @@ function desvioDecidir(id,ap){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
   b.disabled=true;er.textContent='Conferindo senha…';if(!await checkPw(pw)){b.disabled=false;return er.textContent='Senha incorreta.'}er.textContent='';
   b.disabled=true;try{const {data,error}=await sb.rpc('desvio_decidir_seguro',{p_id:id,p_aprovar:ap,p_obs:ob});if(error)throw error;
    if(data==='ok'){m.remove();toast(ap?'Aprovada ✔ — o pedido seguiu para a aba Recolhimentos':'Negada — o pedido segue para o CIMI (aba Recolhimentos)');await dvRefresh()}else{b.disabled=false;er.textContent=dvMsg[data]||'Não foi possível concluir ('+data+').'}}
-  catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}}
+  catch(x2){b.disabled=false;const ms=String(x2.message||x2);er.textContent=/permission denied/i.test(ms)?'Sem permissão no banco ('+ms+'). Isso NÃO é a senha: atualize a página com Ctrl+F5 e tente de novo. Se continuar, avise o suporte.':'Erro: '+ms}}}
 function desvioEntregar(id){const x=(RC||[]).find(r=>r.id===id);if(!x||!x.dv)return;
  const m=mkModal(`<h3>📍 Entrega no destino autorizado</h3><div><strong>${esc(x.ferramenta)}</strong><div>📍 ${esc(x.dv.local||'—')}</div><div class="m">Aprovado por ${esc(x.dv.decisao_por||'—')}</div></div>
  <label>Quem recebeu no local (confirme o nome)</label><input id="dr" value="${esc(x.dv.para||'')}">
@@ -562,7 +562,7 @@ function form(title,fields,okLabel,onSubmit){
  <div class="acts" style="margin-top:14px"><button class="btn" id="ok">${okLabel}</button><button class="btn o" id="no">Cancelar</button></div></div>`;
  document.body.appendChild(m);const c=()=>m.remove();m.querySelector('#no').onclick=c;
  m.querySelector('#ok').onclick=async e=>{const b=e.target;const v={};
-  fields.forEach(f=>{const el=m.querySelector(`[name=${f.k}]`);v[f.k]=f.t==='file'?el.files[0]:el.value.trim()});
+  fields.forEach(f=>{const el=m.querySelector(`[name=${f.k}]`);v[f.k]=f.t==='file'?el.files[0]:(f.t==='password'?el.value:el.value.trim())});
   b.disabled=true;m.querySelector('.err').textContent='';
   try{const r=await onSubmit(v);if(r){m.querySelector('.err').textContent=r;b.disabled=false}else{c();if(me){await load();render()}}}
   catch(x){m.querySelector('.err').textContent='Erro: '+(x.message||x);b.disabled=false}}}
@@ -828,5 +828,10 @@ async function confirmView(tk){let recX='',recBind=()=>{};const box=h=>{$('#app'
   box(det+(data==='ok'?`<p><span class="bd ${ac==='confirmar'?'disponivel':'baixa'}">${ac==='confirmar'?'✔ Recebimento confirmado, obrigado!':'⚠ Divergência registrada'}</span></p>`:'<p class="m">Esta entrega já havia sido respondida.</p>'))};
  $('#cf').onchange=()=>{const f=$('#cf').files[0];$('#cp').innerHTML=f?`<img src="${URL.createObjectURL(f)}" style="max-width:100%;max-height:220px;border-radius:10px">`:''};
  $('#cok').onclick=()=>env('confirmar');$('#cno').onclick=()=>env('contestar')}
+(()=>{const dec=()=>document.querySelectorAll('input[type=password]:not([data-olho])').forEach(i=>{i.dataset.olho=1;if(i.id==='pw')return;
+ const w=document.createElement('div');w.style.cssText='display:flex;gap:6px;align-items:stretch';i.parentNode.insertBefore(w,i);w.appendChild(i);i.style.flex='1';i.style.width='auto';i.style.minWidth='0';
+ const b=document.createElement('button');b.type='button';b.className='btn o';b.textContent='👁';b.title='Mostrar / ocultar a senha digitada';
+ b.onclick=()=>{const on=i.type==='password';i.type=on?'text':'password';b.textContent=on?'🙈':'👁';i.removeAttribute('readonly');i.focus()};w.appendChild(b)});
+ new MutationObserver(dec).observe(document.documentElement,{childList:true,subtree:true});dec()})();
 const TK=new URLSearchParams(location.search).get('c');TK?confirmView(TK):start();
 </script></body></html>
