@@ -139,16 +139,19 @@ function desvioLink(id){const x=(RC||[]).find(r=>r.id===id);if(!x||!x.dv||!x.dv.
 const dvMsg={sem_permissao:'Sem permissão para esta ação.',motivo:'Explique o motivo da urgência (mín. 5 letras).',status_invalido:'Este pedido não está mais ativo.',ja_existe:'Já existe um pedido de mudança de destino para este material.',local_invalido:'Escolha o local de destino.',ja_decidido:'Este pedido já foi decidido por outra pessoa.',obs_obrigatoria:'Para negar, explique o motivo.',sem_aprovacao:'A mudança de destino ainda não foi aprovada.',nao_recolhido:'Confirme primeiro o recolhimento.',foto_obrigatoria:'A foto é obrigatória.',receptor:'Informe o nome de quem recebeu no destino.',para:'Informe para quem vai o material.'};
 const dvRefresh=async()=>{await carregaRC();if(me.papel!=='logistica'){await load();render()}};
 async function desvioPedir(id){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
- const {data:ls,error:le}=await sb.rpc('logistica_locais');if(le)return toast('Erro: '+le.message);const {data:ps}=await sb.rpc('logistica_pessoas');
+ const {data:ls,error:le}=await sb.rpc('logistica_locais');if(le)return toast('Erro: '+le.message);const {data:ps,error:pe}=await sb.rpc('logistica_pessoas');
+ const pl=(ps||[]).map(x=>typeof x==='string'?{nome:x,funcao:'Pessoas'}:x),gp={};pl.forEach(x=>{const g=x.funcao||'Outros';(gp[g]=gp[g]||[]).push(x.nome)});
+ const pops=Object.entries(gp).map(([g,a])=>`<optgroup label="${esc(g)}">${a.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}</optgroup>`).join('');
  const gr={};(ls||[]).forEach(l=>{const g=l.grupo||'Outros';(gr[g]=gr[g]||[]).push(l)});
  const ops=Object.entries(gr).map(([g,a])=>`<optgroup label="${esc(g)}">${a.map(l=>`<option value="${esc(l.id)}">${esc(l.nome)}</option>`).join('')}</optgroup>`).join('');
  const m=mkModal(`<h3>🔀 Mudar destino (demanda extraordinária)</h3><div><strong>${esc(x.ferramenta)}</strong><div class="m">Hoje o destino é o CIMI. A mudança só vale depois de aprovada por Supervisor, Coordenador ou ADM.</div></div>
  <label>Levar para o local</label><select id="dl"><option value="">— escolha o local —</option>${ops}</select>
- <label>Para quem vai o material (nome de quem vai receber)</label><input id="dq" list="dpl" autocomplete="off" placeholder="Digite ou escolha o nome"><datalist id="dpl">${(ps||[]).map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+ <label>Para quem vai o material (quem vai receber)</label><select id="dq0"><option value="">— escolha a pessoa —</option>${pops}<option value="__outro">✍ Outra pessoa (digitar o nome)</option></select><input id="dq" placeholder="Digite o nome completo" style="display:none;margin-top:6px">${pe||!pl.length?`<div class="m" style="color:#c0392b">Lista de pessoas indisponível${pe?': '+esc(pe.message):''}. Escolha "Outra pessoa" e digite o nome.</div>`:''}
  <label>Motivo da urgência (obrigatório)</label><textarea id="dm" rows="3"></textarea><div class="err" id="de"></div>
  <div class="acts" style="margin-top:14px"><button class="btn" id="dok" style="flex:1;padding:12px">Enviar para aprovação</button><button class="btn o" id="dno">Cancelar</button></div>`);
  m.querySelector('#dno').onclick=()=>m.remove();
- m.querySelector('#dok').onclick=async e=>{const b=e.target,er=m.querySelector('#de'),loc=m.querySelector('#dl').value,pq=m.querySelector('#dq').value.trim(),mo=m.querySelector('#dm').value.trim();er.textContent='';
+ m.querySelector('#dq0').onchange=e=>{m.querySelector('#dq').style.display=e.target.value==='__outro'?'':'none'};
+ m.querySelector('#dok').onclick=async e=>{const b=e.target,er=m.querySelector('#de'),loc=m.querySelector('#dl').value,pq=((m.querySelector('#dq0').value==='__outro'?m.querySelector('#dq').value:m.querySelector('#dq0').value)||'').trim(),mo=m.querySelector('#dm').value.trim();er.textContent='';
   if(!loc)return er.textContent='Escolha o local de destino.';if(pq.length<3)return er.textContent='Informe para quem vai o material.';if(mo.length<5)return er.textContent='Explique o motivo da urgência.';
   b.disabled=true;try{const {data,error}=await sb.rpc('desvio_solicitar',{p_id:id,p_local:loc,p_motivo:mo,p_para:pq});if(error)throw error;
    if(data==='ok'){m.remove();toast('Pedido enviado para aprovação ✔');await dvRefresh()}else{b.disabled=false;er.textContent=dvMsg[data]||'Não foi possível enviar ('+data+').'}}
