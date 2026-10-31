@@ -160,11 +160,14 @@ async function desvioPedir(id){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
   catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}}
 function desvioDecidir(id,ap){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
  const m=mkModal(`<h3>${ap?'✔ Aprovar':'✖ Negar'} mudança de destino</h3><div><strong>${esc(x.ferramenta)}</strong><div>📍 ${esc(x.dv?.local||'—')}</div><div>👷 Para: <strong>${esc(x.dv?.para||'—')}</strong></div><div class="m">${esc(x.dv?.motivo||'')}</div></div>
- <label>Observação ${ap?'(opcional)':'(obrigatória ao negar)'}</label><textarea id="do" rows="2"></textarea><div class="err" id="de"></div>
+ <label>Observação ${ap?'(opcional)':'(obrigatória ao negar)'}</label><textarea id="do" rows="2"></textarea>
+ <label>🔒 Sua senha de acesso (obrigatória para ${ap?'aprovar':'negar'})</label><input type="password" id="dpw" autocomplete="current-password"><div class="err" id="de"></div>
  <div class="acts" style="margin-top:14px"><button class="btn ${ap?'':'r'}" id="dok" style="flex:1;padding:12px">${ap?'Confirmar aprovação':'Confirmar negativa'}</button><button class="btn o" id="dno">Cancelar</button></div>`);
  m.querySelector('#dno').onclick=()=>m.remove();
  m.querySelector('#dok').onclick=async e=>{const b=e.target,er=m.querySelector('#de'),ob=m.querySelector('#do').value.trim();er.textContent='';
   if(!ap&&ob.length<3)return er.textContent='Para negar, explique o motivo.';
+  const pw=m.querySelector('#dpw').value;if(!pw)return er.textContent='Digite sua senha de acesso para '+(ap?'aprovar':'negar')+'.';
+  b.disabled=true;er.textContent='Conferindo senha…';if(!await checkPw(pw)){b.disabled=false;return er.textContent='Senha incorreta.'}er.textContent='';
   b.disabled=true;try{const {data,error}=await sb.rpc('desvio_decidir',{p_id:id,p_aprovar:ap,p_obs:ob});if(error)throw error;
    if(data==='ok'){m.remove();toast(ap?'Aprovada ✔ — o pedido seguiu para a aba Recolhimentos':'Negada — o pedido segue para o CIMI (aba Recolhimentos)');await dvRefresh()}else{b.disabled=false;er.textContent=dvMsg[data]||'Não foi possível concluir ('+data+').'}}
   catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}}
