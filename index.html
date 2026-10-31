@@ -161,7 +161,7 @@ function desvioDecidir(id,ap){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
  m.querySelector('#dok').onclick=async e=>{const b=e.target,er=m.querySelector('#de'),ob=m.querySelector('#do').value.trim();er.textContent='';
   if(!ap&&ob.length<3)return er.textContent='Para negar, explique o motivo.';
   b.disabled=true;try{const {data,error}=await sb.rpc('desvio_decidir',{p_id:id,p_aprovar:ap,p_obs:ob});if(error)throw error;
-   if(data==='ok'){m.remove();toast(ap?'Mudança de destino aprovada ✔':'Mudança de destino negada');await dvRefresh()}else{b.disabled=false;er.textContent=dvMsg[data]||'Não foi possível concluir ('+data+').'}}
+   if(data==='ok'){m.remove();toast(ap?'Aprovada ✔ — o pedido seguiu para a aba Recolhimentos':'Negada — o pedido segue para o CIMI (aba Recolhimentos)');await dvRefresh()}else{b.disabled=false;er.textContent=dvMsg[data]||'Não foi possível concluir ('+data+').'}}
   catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}}
 function desvioEntregar(id){const x=(RC||[]).find(r=>r.id===id);if(!x||!x.dv)return;
  const m=mkModal(`<h3>📍 Entrega no destino autorizado</h3><div><strong>${esc(x.ferramenta)}</strong><div>📍 ${esc(x.dv.local||'—')}</div><div class="m">Aprovado por ${esc(x.dv.decisao_por||'—')}</div></div>
@@ -181,9 +181,32 @@ function desvioEntregar(id){const x=(RC||[]).find(r=>r.id===id);if(!x||!x.dv)ret
    if(data&&data.r==='ok'){m.remove();toast(data.token?(data.tem_login?'Entrega registrada ✔ — a confirmação foi enviada ao login de '+rc+' e também pode ser feita por link/QR':'Entrega registrada ✔ — aguardando a confirmação de '+rc):'Entrega registrada ✔');
    if(data.token)shareConf({token:data.token,pessoa:rc,ferr:x.ferramenta,local:x.dv.local||'',logi:me.nome});await dvRefresh()}else{b.disabled=false;const k=data&&data.r;er.textContent=dvMsg[k]||'Não foi possível registrar ('+k+').'}}
   catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}}
+// ---------- Aba "Aprovações" (mudanças de destino aguardando decisão) ----------
+const rcHid=x=>!!me&&me.papel!=='logistica'&&!!x.dv&&x.dv.destino_status==='solicitado';
+const aprPend=()=>(RC||[]).filter(x=>x.dv&&x.dv.destino_status==='solicitado');
+function aprovView(){
+ if(RC===null){carregaRC();return'<p class="m">Carregando pedidos…</p>'}
+ const pend=aprPend(),pode=podeAprovar(),
+  dec=(RC||[]).filter(x=>x.dv&&['aprovado','negado'].includes(x.dv.destino_status)).sort((a,b)=>new Date(b.dv.decisao_em||0)-new Date(a.dv.decisao_em||0)).slice(0,10);
+ const sit=x=>x.status==='recolhido'?'🚚 Já recolhido pela Logística':x.status==='pendente'?'⏳ Ainda não recolhido':'✔ Entregue';
+ const base=(x,cor,tit,extra)=>{const dv=x.dv;return`<div class="card" style="margin-bottom:12px;border-left:6px solid ${cor}">
+  <div style="font-size:12px;font-weight:700;color:${cor}">${tit}</div>
+  <div style="font-size:20px;font-weight:800;margin:4px 0">${esc(x.ferramenta)} <span class="m">${esc(x.patrimonio||'')}</span></div>
+  <div>📍 Está em: <strong>${esc(x.local||'—')}</strong>${x.com?` <span class="m">(com ${esc(x.com)})</span>`:''}</div>
+  <div>➡ Levar para: <strong>${esc(dv.local||'—')}</strong> <span class="m">(em vez do CIMI)</span></div>
+  <div>👷 Para: <strong>${esc(dv.para||'—')}</strong></div>
+  <div style="margin-top:6px">💬 ${esc(dv.motivo||'')}</div>
+  <div class="m" style="margin-top:6px">Pedido por <strong>${esc(dv.solic_por||'—')}</strong> · ${dv.solic_em?fmt(dv.solic_em):''} · ${sit(x)}</div>${extra}</div>`};
+ const pc=x=>base(x,'var(--o)','🔀 DEMANDA EXTRAORDINÁRIA — AGUARDANDO APROVAÇÃO',pode?`<div class="acts" style="margin-top:12px"><button class="btn" style="flex:1;padding:14px;font-size:16px" onclick="desvioDecidir('${x.id}',true)">✔ Aprovar</button><button class="btn r" style="flex:1;padding:14px;font-size:16px" onclick="desvioDecidir('${x.id}',false)">✖ Negar</button></div>`:'<div class="m" style="margin-top:8px">Só Supervisor, Coordenador ou ADM podem decidir.</div>');
+ const dc=x=>{const ok=x.dv.destino_status==='aprovado';return base(x,ok?'var(--g)':'#c0392b',ok?'✔ APROVADA — seguiu para a aba Recolhimentos':'✖ NEGADA — segue para o CIMI',`<div class="m" style="margin-top:6px">${ok?'Aprovado':'Negado'} por ${esc(x.dv.decisao_por||'—')} · ${x.dv.decisao_em?fmt(x.dv.decisao_em):''}${x.dv.decisao_obs?' · '+esc(x.dv.decisao_obs):''}</div>`)};
+ return`${RCerr?`<p class="err">Não foi possível carregar os pedidos: ${esc(RCerr)}</p>`:''}
+ <div class="card" style="margin-bottom:14px;background:${pend.length?'#fff4e5':'#e9f7ee'};border-color:${pend.length?'var(--o)':'var(--g)'};display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+  <strong style="font-size:18px;flex:1">${pend.length?`🔀 ${pend.length} mudança${pend.length>1?'s':''} de destino aguardando aprovação`:'✔ Nenhuma aprovação pendente'}</strong><button class="btn o" onclick="carregaRC()">↻ Atualizar</button></div>
+ ${pend.map(pc).join('')}
+ ${dec.length?`<h3 style="margin:18px 0 8px">Decididas recentemente</h3>${dec.map(dc).join('')}`:''}`}
 const rcManter=x=>x.status==='concluido'&&String(x.ferramenta||'').toUpperCase()==='CARRINHO DE MÃO'&&String(x.solicitante||'').trim().toLowerCase()==='davson rocha silva'||new Date(x.quando)>new Date('2026-10-30T20:00:00Z');
-const rcPend=()=>(RC||[]).filter(x=>x.status==='pendente');
-const rcRec=()=>(RC||[]).filter(x=>x.status==='recolhido');
+const rcPend=()=>(RC||[]).filter(x=>x.status==='pendente'&&!rcHid(x));
+const rcRec=()=>(RC||[]).filter(x=>x.status==='recolhido'&&!rcHid(x));
 let rcTab='pend';const rcGo=t=>{rcTab=t;if(me.papel==='logistica')logView();else render()};
 async function carregaRC(){if(RCbusy)return;RCbusy=true;
  try{const {data,error}=await sb.rpc('logistica_pendentes');if(error)throw error;RC=data||[];RCerr='';try{const {data:dv}=await sb.rpc('logistica_desvios');const mp=Object.fromEntries((dv||[]).map(d=>[d.id,d]));RC=RC.map(x=>({...x,dv:mp[x.id]||null}))}catch(_){}}catch(e){RC=[];RCerr=e.message||String(e)}
@@ -211,7 +234,7 @@ function recolHtml(){
   ${tra&&!cm?'<div class="m" style="margin-top:8px">⏳ Entregue o material no CIMI. A baixa só é dada quando o CIMI confirmar o recebimento.</div>':''}</div>`};
  const card=x=>cardDv(card0(x),x,cm);
  const partes=[];if(p.length)partes.push(`🔔 ${p.length} pedido${p.length>1?'s':''} de recolhimento`);if(tr.length)partes.push(cm?`📥 ${tr.length} para o CIMI receber`:`🚚 ${tr.length} aguardando recebimento do CIMI`);
- const dvp=cm&&podeAprovar()?(RC||[]).filter(x=>x.dv&&x.dv.destino_status==='solicitado'):[];if(dvp.length)partes.unshift(`🔀 ${dvp.length} mudança${dvp.length>1?'s':''} de destino para aprovar`);
+ const dvp=[];if(dvp.length)partes.unshift(`🔀 ${dvp.length} mudança${dvp.length>1?'s':''} de destino para aprovar`);
  const secDv=dvp.length?`<h3 style="margin:4px 0 8px">🔀 Demandas extraordinárias — aguardando sua aprovação</h3>${dvp.map(card).join('')}`:'';
  const alerta=p.length>0||(cm&&tr.length>0)||dvp.length>0;
  return`${RCerr?`<p class="err">Não foi possível carregar os pedidos: ${esc(RCerr)}</p>`:''}
@@ -650,9 +673,9 @@ const act=(fn,id,arr)=>fn(arr.find(x=>x.id===id));
 
 // ---------- Telas ----------
 function render(){
- const tabs=[['painel','🧰 Ferramentas'],['hist','🕘 Movimentações'],['locais','📍 Locais'],['pessoas','👷 Pessoas'],['funcoes','🏷️ Funções'],['edic','✏️ Edições']];{const nr=rcPend().length+rcRec().length;tabs.push(['recol','🚚 Recolhimentos'+(nr?' <span class="pill u">'+nr+'</span>':'')])}if(me.papel==='principal')tabs.push(['acessos','🔑 Acessos']);
+ const tabs=[['painel','🧰 Ferramentas'],['hist','🕘 Movimentações'],['locais','📍 Locais'],['pessoas','👷 Pessoas'],['funcoes','🏷️ Funções'],['edic','✏️ Edições']];{const nr=rcPend().length+rcRec().length;tabs.push(['recol','🚚 Recolhimentos'+(nr?' <span class="pill u">'+nr+'</span>':'')]);const na=aprPend().length;tabs.push(['aprov','🔀 Aprovações'+(na?' <span class="pill u">'+na+'</span>':'')])}if(me.papel==='principal')tabs.push(['acessos','🔑 Acessos']);
  $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas</h1><small>${esc(me.nome)} (${meCargo()||(me.papel==='principal'?'principal':'correlato')})</small><button class="btn o s" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></header>
- <nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';q='';render()">${t[1]}</button>`).join('')}</nav><main>${{painel,hist:histView,locais,pessoas,funcoes,edic,acessos,recol:recolHtml}[tab]()}</main>`;
+ <nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';q='';render()">${t[1]}</button>`).join('')}</nav><main>${{painel,hist:histView,locais,pessoas,funcoes,edic,acessos,recol:recolHtml,aprov:aprovView}[tab]()}</main>`;
  const s=$('#q');if(s){s.oninput=e=>{q=e.target.value;const p=e.target.selectionStart;render();const n=$('#q');n.focus();n.setSelectionRange(p,p)}}}
 const recAtiva=fid=>(D.rc||[]).find(r=>r.ferramenta_id===fid&&(r.status==='pendente'||r.status==='recolhido'));
 function painel(){const c=k=>D.f.filter(x=>x.status===k).length;
