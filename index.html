@@ -75,7 +75,7 @@ const ST={disponivel:'Disponível (CIMI)',em_uso:'Em uso',baixa:'Baixa'};
 let usoSel='todos';
 const USOS=[['Manutenção','🔧','#2b6cb0'],['Pintura','🎨','#d6457a'],['Jardinagem','🌿','#2e9e4f']];
 let gSel='todos';const GR_CIMI='CIMI (Estoque)';
-const GRUPOS=['Estações BRT Norte Sul','Estações BRT Leste Oeste','Terminais Estações BRT Leste - Oeste','Terminais Estações BRT Norte - Sul','Terminais Primitivos',"PA'S"];
+const GRUPOS=['Estações BRT Norte Sul','Estações BRT Leste Oeste','Terminais Estações BRT Leste - Oeste','Terminais Estações BRT Norte - Sul','Terminais Primitivos','BRT Leste Oeste','BRT Norte Sul',"PA'S"];
 const tipoDe=g=>g===GR_CIMI?'estoque':g.startsWith('Terminais')?'terminal':g==="PA'S"?'pa':'estacao';
 function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',3000)}
 const L=id=>D.l.find(x=>x.id===id),F=id=>D.f.find(x=>x.id===id),FN=id=>D.fn.find(x=>x.id===id);
@@ -678,6 +678,17 @@ function editL(l){form(`Editar: ${esc(l.nome)}`,[...lFields(l),pwField],'Salvar 
  if(!await checkPw(v.senha))return'Senha incorreta.';const diffs=[],n={};
  ['nome','grupo','armazem','centro_custo'].forEach(k=>{if((l[k]??'')!==v[k]){diffs.push([k,l[k],v[k]]);n[k]=v[k]}});
  if(!diffs.length)return'Nada foi alterado.';if(n.grupo)n.tipo=tipoDe(n.grupo);const {error}=await sb.from('locais').update(n).eq('id',l.id);if(error)throw error;await logEdit('locais',l.nome,diffs);toast('Edição registrada ✔')})}
+async function excluirL(l){
+ if(l.tipo==='estoque')return toast('O CIMI (estoque) não pode ser excluído.');
+ const emUso=D.f.filter(f=>f.local_atual_id===l.id&&f.status==='em_uso').length;
+ if(emUso)return toast(`Não dá para excluir: há ${emUso} ferramenta(s) em uso neste local. Devolva/transfira antes.`);
+ let n=0;try{const c=async(t,col)=>{const {count,error}=await sb.from(t).select('id',{count:'exact',head:true}).eq(col,l.id);if(error)throw error;return count||0};
+  n=await c('movimentacoes','local_id')+await c('recolhimentos','local_id')+await c('ferramentas','local_atual_id')}catch(e){return toast('Não foi possível conferir o histórico: '+(e.message||e))}
+ if(n)return toast(`Este local tem histórico (${n} registro(s) de movimentações/pedidos). Excluir apagaria o nome dele do histórico. Use ✏️ Editar para renomear.`);
+ form(`🗑 Excluir local: ${esc(l.nome)}`,[{k:'aviso',l:'<b style="color:#c0392b">Atenção: não pode ser desfeito.</b> Só é permitido para local sem ferramentas e sem histórico. Digite sua senha para confirmar.',t:'hidden',value:''},pwField],'Excluir definitivamente',async v=>{
+  if(!await checkPw(v.senha))return'Senha incorreta.';
+  const {error}=await sb.from('locais').delete().eq('id',l.id);if(error)throw error;
+  await logEdit('locais',l.nome,[['excluído',l.nome,'—']]);toast('Local excluído ✔')})}
 const pFields=p=>[{k:'nome',l:'Nome completo',value:p?.nome},{k:'funcao_id',l:'Função',t:'select',value:p?.funcao_id,opts:D.fn.map(x=>[x.id,x.nome])},
  {k:'logistica',l:'🚚 Faz entregas pela Logística?',t:'select',value:p?.logistica||'',opts:[['','Não'],['fixo','Sim – Logística fixo'],['eventual','Sim – Logística eventual (às vezes)']]},
  ...(p?[{k:'ativo',l:'Situação',t:'select',value:String(p.ativo),opts:[['true','Ativo'],['false','Inativo (não aparece nas retiradas)']]}]:[])];
@@ -780,7 +791,7 @@ function histView(){if(MVsig!==JSON.stringify(MV)){Object.assign(MVd,MV);MVsig=J
  <div class="m" style="margin-top:8px">${nC(lista)} movimentação(ões) no filtro atual${mvUso==='todos'?'':' ('+esc(usoNome(mvUso))+')'}${nC(lista)!==lista.length?` — ${lista.length} registros (retiradas e devoluções)`:''}.${lista.filter(pend).length?` · <b style="color:var(--o)">⏳ ${lista.filter(pend).length} entrega(s) da Logística aguardando confirmação</b>`:''}${alt?' · <b style="color:var(--o)">Filtro alterado: clique em 🔍 Filtrar</b>':''} Ao imprimir ou baixar, uma caixa pergunta o período.</div></div><div class="tw"><table><tr><th>Data da Retirada / Retorno</th><th>Tipo</th><th>Ferramenta</th><th>Saiu de</th><th>Foi para</th><th>Dias no destino</th><th>Pessoa</th><th>Entrega / Confirmação</th><th>Foto</th><th>Registrado por</th><th>Percurso</th></tr>
  ${lista.map(x=>`<tr><td><div class="m" style="font-weight:700;margin-bottom:2px">${x.tipo==='retirada'?'Data da Retirada':'Data de Retorno'}</div>${fmt(x.created_at)}<div><button class="btn s o" title="Alterar data (pede senha)" onclick="dataMov('${x.id}')">📅 Data</button></div></td><td><span class="bd ${x.tipo}">${x.tipo}</span></td><td>${esc(F(x.ferramenta_id)?.nome)}<div class="m">${esc(F(x.ferramenta_id)?.patrimonio)}</div></td>
  ${rotaTd(x)}<td>${dias(x)}</td><td>${esc(x.pessoa)}</td><td>${confBadge(x)}${recBadge(x)}</td><td><img class="ph" src="${x.foto_url}" onclick="foto('${x.foto_url}')"></td><td>${esc(x.usuario_nome)}</td><td><button class="btn s" onclick="movDet('${x.id}')">🔎 Detalhes</button></td></tr>`).join('')||'<tr><td colspan=11 class="m">Nenhuma movimentação encontrada.</td></tr>'}</table></div>`}
-const GV={[GR_CIMI]:['🏠','#2e9e4f'],'Estações BRT Norte Sul':['🚏','#2b6cb0'],'Estações BRT Leste Oeste':['🚏','#7b4fc4'],'Terminais Estações BRT Leste - Oeste':['🚌','#0f8f8f'],'Terminais Estações BRT Norte - Sul':['🚌','#c2410c'],'Terminais Primitivos':['🏛️','#8a6d3b'],"PA'S":['🏢','#d6457a'],'Sem grupo':['📍','#6b7a71']};
+const GV={[GR_CIMI]:['🏠','#2e9e4f'],'Estações BRT Norte Sul':['🚏','#2b6cb0'],'Estações BRT Leste Oeste':['🚏','#7b4fc4'],'Terminais Estações BRT Leste - Oeste':['🚌','#0f8f8f'],'Terminais Estações BRT Norte - Sul':['🚌','#c2410c'],'Terminais Primitivos':['🏛️','#8a6d3b'],'BRT Leste Oeste':['🚍','#b7791f'],'BRT Norte Sul':['🚍','#2c7a7b'],"PA'S":['🏢','#d6457a'],'Sem grupo':['📍','#6b7a71']};
 const usoEm=id=>D.f.filter(f=>f.status==='em_uso'&&f.local_atual_id===id);
 function verL(id){const l=L(id),us=usoEm(id),ms=D.m.filter(x=>x.local_id===id).slice(0,8);const m=document.createElement('div');m.className='mask';m.addEventListener('click',e=>{if(e.target===m)m.remove()});
  m.innerHTML=`<div class="modal"><h3>📍 ${esc(l.nome)}</h3><div class="m">${esc(l.grupo||'')}${l.armazem?' · Armazém '+esc(l.armazem):''}${l.centro_custo?' · CC '+esc(l.centro_custo):''}</div>
@@ -798,7 +809,7 @@ function locais(){const t=q.toLowerCase();const todos=[GR_CIMI,...GRUPOS,'Sem gr
  const sec=g=>{if(gSel!=='todos'&&gSel!==g)return'';const r=lista.filter(l=>(l.grupo||'Sem grupo')===g);if(!r.length)return'';const c=GV[g][1];
   return`<div class="gh" style="--c:${c}">${GV[g][0]} ${esc(g)} <span class="pill">${r.length}</span></div><div class="lg">${r.map((l,i)=>{const u=usoEm(l.id).length;
   return`<div class="tile" style="--c:${c};animation-delay:${Math.min(i,12)*30}ms"><b>${esc(l.nome)}</b><div>${l.armazem?`<span class="pill">Armazém ${esc(l.armazem)}</span> `:''}${l.centro_custo?`<span class="pill">CC ${esc(l.centro_custo)}</span> `:''}${u?`<span class="pill u">🧰 ${u} em uso</span>`:'<span class="pill z">livre</span>'}</div>
-  <div class="acts"><button class="btn s" onclick="verL('${l.id}')">👁 Detalhes</button><button class="btn s o" onclick="act(editL,'${l.id}',D.l)">✏️ Editar</button></div></div>`}).join('')}</div>`};
+  <div class="acts"><button class="btn s" onclick="verL('${l.id}')">👁 Detalhes</button><button class="btn s o" onclick="act(editL,'${l.id}',D.l)">✏️ Editar</button>${l.tipo==='estoque'?'':`<button class="btn s o" style="color:#c0392b;border-color:#c0392b" onclick="act(excluirL,'${l.id}',D.l)">🗑 Excluir</button>`}</div></div>`}).join('')}</div>`};
  return`<div class="gg">${cards}</div><div class="bar"><input id="q" placeholder="🔎 Buscar local por nome, armazém ou centro de custo..." value="${esc(q)}"><button class="btn" onclick="novoL()">+ Novo local</button></div>${todos.map(sec).join('')||'<p class="m">Nenhum local encontrado.</p>'}`}
 const FCOR=['#2b6cb0','#d6457a','#2e9e4f','#7b4fc4','#c2410c','#0f8f8f','#8a6d3b'];
 const fcor=id=>FCOR[Math.max(0,D.fn.findIndex(x=>x.id===id))%FCOR.length];
