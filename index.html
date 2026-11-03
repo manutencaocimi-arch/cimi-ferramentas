@@ -281,9 +281,12 @@ function recolHtml(){
   <button class="btn ${rcTab==='rec'?'':'o'}" style="flex:1;padding:12px" onclick="rcGo('rec')">🚚 Recolhidos (${tr.length+ok.length})</button></div>
  ${rcTab==='and'?andHtml():rcTab==='pend'?(p.length?`${pE.length?`<h3 style="margin:4px 0 8px">🚚 Entregas autorizadas — retirar e entregar</h3>${pE.map(card).join('')}`:''}${pC.length?`${pE.length?'<h3 style="margin:18px 0 8px">🔔 Recolher para o CIMI</h3>':''}${pC.map(card).join('')}`:''}${pS.length?`<h3 style="margin:18px 0 8px">🔀 Destino aguardando aprovação</h3>${pS.map(card).join('')}`:''}`:'<p class="m">Nenhuma solicitação pendente.</p>')
   :`${trE.length?`<h3 style="margin:4px 0 8px">🚚 ${cm?'A caminho do destino autorizado':'Retirados — levar e entregar no destino'}</h3>${trE.map(card).join('')}`:''}${trC.length?`<h3 style="margin:${trE.length?18:4}px 0 8px">${cm?'A caminho do CIMI — aguardando recebimento':'Recolhidos — levar ao CIMI'}</h3>${trC.map(card).join('')}`:''}${trS.length?`<h3 style="margin:18px 0 8px">🔀 Retirados — destino aguardando aprovação</h3>${trS.map(card).join('')}`:''}${okC.length?`<h3 style="margin:18px 0 8px">${cm?'Recebidos no CIMI':'Entregues ao CIMI'} (últimos 30 dias)</h3>${okC.map(card).join('')}`:''}${okE.length?`<h3 style="margin:18px 0 8px">📍 Entregues nos destinos autorizados (últimos 30 dias)</h3>${okE.map(card).join('')}`:''}${tr.length||ok.length?'':'<p class="m">Nenhuma ferramenta recolhida ainda.</p>'}`}`}
-function logView(){const n=rcPend().length;document.title=(n?`(${n}) `:'')+'CIMI · Logística';
- $('#app').innerHTML=`<header><h1>🚚 CIMI · Logística</h1><small>${esc(me.nome)}</small><button class="btn o s" onclick="sair()">Sair</button></header><main style="max-width:720px;padding:14px">${recolHtml()}</main>`}
-function iniciaLogistica(){logView();setInterval(()=>{if(!document.hidden&&!document.querySelector('.mask'))carregaRC()},20000);
+let DM='log';
+const dualBar=c=>{if(!me||!me.dual)return'';const n=rcPend().length,k=exPend().length;return`<div class="acts" style="max-width:720px;margin:12px auto 0;padding:0 14px"><button class="btn ${c==='log'?'':'o'}" style="flex:1;padding:12px" onclick="dualGo('log')">🚚 Logística${n?' ('+n+')':''}</button><button class="btn ${c==='ex'?'':'o'}" style="flex:1;padding:12px" onclick="dualGo('ex')">🛠️ Minhas ferramentas${k?' ('+k+')':''}</button></div>`};
+function dualGo(m){DM=m;if(m==='ex'){exView();carregaEX()}else logView()}
+function logView(){if(me.dual&&DM==='ex')return exView();const n=rcPend().length;document.title=(n?`(${n}) `:'')+'CIMI · Logística';
+ $('#app').innerHTML=`<header><h1>🚚 CIMI · Logística</h1><small>${esc(me.nome)}</small><button class="btn o s" onclick="sair()">Sair</button></header>${dualBar('log')}<main style="max-width:720px;padding:14px">${recolHtml()}</main>`}
+function iniciaLogistica(){if(me.dual)carregaEX();logView();setInterval(()=>{if(!document.hidden&&!document.querySelector('.mask')){carregaRC();if(me.dual)carregaEX()}},20000);
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)carregaRC()})}
 function recolher(id){const x=RC.find(r=>r.id===id);if(!x)return;if(solDest(x)&&x.status==='pendente'){toast('Retirada travada: aguarde a autorização de Supervisor, Coordenador ou ADM.');return}const ea=ent(x);const m=document.createElement('div');m.className='mask';
  m.innerHTML=`<div class="modal"><h3>${ea?'📷 ① Confirmar retirada no local':'📷 Confirmar recolhimento'}</h3><div><strong>${esc(x.ferramenta)}</strong> <span class="m">${esc(x.patrimonio||'')}</span><div class="m">${esc(x.local||'')} → ${ea?'levar e entregar a <strong>'+esc(x.dv.para||'—')+'</strong> em <strong>'+esc(x.dv.local||'—')+'</strong>':solDest(x)?'aguardar a decisão do destino (aprovado: entregar no destino autorizado · negado: levar ao CIMI)':'levar ao CIMI (o CIMI confirma o recebimento e dá a baixa)'}</div>${x.foto_pedido?`<div class="m" style="margin-top:8px">📷 Foto enviada por quem pediu:</div><img src="${esc(x.foto_pedido)}" style="max-width:100%;max-height:200px;border-radius:8px" onclick="foto('${esc(x.foto_pedido)}')">`:''}</div>
@@ -321,14 +324,15 @@ function cimiReceber(id){const rr=(D.rc||[]).find(r=>r.id===id),xr=(RC||[]).find
    else{b.disabled=false;er.textContent=data==='foto_obrigatoria'?'A foto é obrigatória.':data==='nao_recolhido'?'A Logística ainda não confirmou o recolhimento.':'Sem permissão para dar baixa.'}}
   catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}}
 function perfilAC(id){const u=AC.find(x=>x.id===id);
- form(`Perfil de acesso: ${esc(loginDe(u))}`,[{k:'papel',l:'Perfil',t:'select',value:u.papel==='logistica'?'logistica':u.papel==='executor'?'executor':'correlato',opts:[['correlato','Correlato — usa o sistema completo'],['logistica','🚚 Logística — vê somente os pedidos de recolhimento'],['executor','🛠️ Executor — vê só as ferramentas sob a sua guarda']]},pwField],'Salvar perfil',async v=>{
+ form(`Perfil de acesso: ${esc(loginDe(u))}`,[{k:'papel',l:'Perfil',t:'select',value:u.papel==='logistica'?(u.tambem_executor?'logistica_executor':'logistica'):u.papel==='executor'?'executor':'correlato',opts:[['correlato','Correlato — usa o sistema completo'],['logistica','🚚 Logística — vê somente os pedidos de recolhimento'],['logistica_executor','🚚🛠️ Logística + Executor — faz a Logística e também tem ferramentas sob a sua guarda'],['executor','🛠️ Executor — vê só as ferramentas sob a sua guarda']]},pwField],'Salvar perfil',async v=>{
   if(!await checkPw(v.senha))return'Senha incorreta.';
   const {data,error}=await sb.rpc('admin_definir_papel',{alvo:id,novo:v.papel});if(error)throw error;
+  if(data==='sem_pessoa_vinculada')return'Esse usuário não está vinculado a uma pessoa cadastrada em Pessoas. Cadastre a pessoa (Manutencionista, Jardineiro ou Pintor) e crie/vincule o usuário antes.';
   if(data!=='ok')return'Não foi possível alterar o perfil ('+data+').';
-  await logEdit('acessos',loginDe(u),[['perfil',u.papel,v.papel]]);AC=null;toast('Perfil atualizado ✔')})}
+  await logEdit('acessos',loginDe(u),[['perfil',u.papel+(u.tambem_executor?' + executor':''),v.papel]]);AC=null;toast('Perfil atualizado ✔')})}
 let AC=null,ACerr='';
 const loginDe=u=>String(u.email||'').split('@')[0]||u.nome||'';
-async function carregaAC(){try{AC=(await api('listar')).usuarios;ACerr=''}catch(e){AC=[];ACerr=e.message}render()}
+async function carregaAC(){try{AC=(await api('listar')).usuarios;ACerr='';try{const {data:ex}=await sb.rpc('admin_perfis_extra');const st=new Set(ex||[]);AC.forEach(u=>{u.tambem_executor=st.has(u.id)})}catch(_){}}catch(e){AC=[];ACerr=e.message}render()}
 function acessos(){if(AC===null){carregaAC();return'<p class="m">Carregando acessos…</p>'}
  const t=q.toLowerCase(),r=AC.filter(u=>`${u.nome} ${u.email}`.toLowerCase().includes(t)).sort((a,b)=>(CG[a.id]?.ordem??9999)-(CG[b.id]?.ordem??9999));
  return`<div class="card m" style="margin-bottom:12px">🔒 Senhas que o <strong>próprio usuário</strong> escolheu ficam criptografadas e não podem ser vistas por ninguém, só redefinidas. Já a <strong>senha provisória</strong> (a que você define ou a enviada por e-mail) fica visível aqui até o usuário trocá-la.</div>
@@ -500,8 +504,8 @@ function exHtml(){if(EX===null){carregaEX();return'<p class="m">Carregando…</p
  :ped.map(r=>`<div class="card" style="margin-bottom:12px;border-left:6px solid ${r.status==='concluido'?'var(--g)':r.status==='recolhido'?'var(--bl)':'var(--o)'}"><div style="font-size:12px;font-weight:700">${esc(exSt(r.status))}</div>
   <div style="font-size:18px;font-weight:800;margin:4px 0">${esc(r.ferramenta)} <span class="m">${esc(r.patrimonio||'')}</span></div>${r.avulso?`<div><span class="pill u">📦 Material avulso</span>${r.local?` <span class="m">📍 ${esc(r.local)}</span>`:''}</div>`:''}<div class="m">Pedido em ${fmt(r.quando)}</div>${r.obs?`<div style="margin-top:6px">💬 ${esc(r.obs)}</div>`:''}
   ${r.recolhido_por?`<div class="m" style="margin-top:6px">🚚 Recolhido por ${esc(r.recolhido_por)}${r.recolhido_em?' · '+fmt(r.recolhido_em):''}</div>`:''}${r.recebido_em?`<div class="m">📥 Recebido no CIMI · ${fmt(r.recebido_em)}</div>`:''}</div>`).join('')||'<p class="m">Você ainda não fez nenhum pedido de retirada (nos últimos 30 dias).</p>'}`}
-function exView(){const n=exPend().length;document.title=(n?`(${n}) `:'')+'CIMI · Minhas ferramentas';
- $('#app').innerHTML=`<header><h1>🛠️ CIMI · Minhas ferramentas</h1><small>${esc(me.nome)}</small><button class="btn o s" onclick="sair()">Sair</button></header><main style="max-width:720px;padding:14px">${exHtml()}</main>`}
+function exView(){if(me.dual&&DM==='log')return logView();const n=exPend().length;document.title=(n?`(${n}) `:'')+'CIMI · Minhas ferramentas';
+ $('#app').innerHTML=`<header><h1>🛠️ CIMI · Minhas ferramentas</h1><small>${esc(me.nome)}</small><button class="btn o s" onclick="sair()">Sair</button></header>${dualBar('ex')}<main style="max-width:720px;padding:14px">${exHtml()}</main>`}
 function iniciaExecutor(){exView();carregaEX();setInterval(()=>{if(!document.hidden&&!document.querySelector('.mask'))carregaEX()},20000);
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)carregaEX()})}
 async function exUp(file){const bl=await shrink(file),pa=`executor/${me.id}/${Date.now()}.jpg`;
@@ -566,7 +570,7 @@ function loginView(msg=''){ $('#app').innerHTML=`<div class="login"><h2>🛠️ 
 async function start(){
  const {data:{session}}=await sb.auth.getSession(); if(!session)return loginView();
  const {data:p}=await sb.from('profiles').select('*').eq('id',session.user.id).single();
- me={id:session.user.id,email:session.user.email,nome:p?.nome||session.user.email,papel:p?.papel||'correlato'};me.trocar=p?.trocar_senha===true&&me.papel!=='principal';
+ me={id:session.user.id,email:session.user.email,nome:p?.nome||session.user.email,papel:p?.papel||'correlato'};me.dual=me.papel==='logistica'&&p?.tambem_executor===true;me.trocar=p?.trocar_senha===true&&me.papel!=='principal';
  if(me.trocar)return trocarView();
  if(me.papel==='logistica')return iniciaLogistica();
  if(me.papel==='executor')return iniciaExecutor();
