@@ -241,7 +241,7 @@ function recolHtml(){
  if(RC===null){carregaRC();return'<p class="m">Carregando pedidos…</p>'}
  const cm=me.papel!=='logistica',pode=['logistica','principal'].includes(me.papel),p=rcPend(),tr=rcRec(),ok=RC.filter(x=>x.status==='concluido'),pE=p.filter(ent),pC=p.filter(x=>!ent(x)&&!solDest(x)),pS=p.filter(solDest),trE=tr.filter(ent),trC=tr.filter(x=>!ent(x)&&!solDest(x)),trS=tr.filter(solDest),okE=ok.filter(altDest),okC=ok.filter(x=>!altDest(x));
  const bt=(u,l)=>u?`<div style="margin-top:8px"><div class="m">${l}</div><img src="${esc(u)}" style="max-width:200px;max-height:200px;border-radius:8px;cursor:pointer;border:1px solid var(--b)" onclick="foto('${esc(u)}')"></div>`:'';
- const card0=x=>{const pe=x.status==='pendente',tra=x.status==='recolhido',ea=ent(x),ad=altDest(x),sd=solDest(x),cor=pe?'var(--o)':tra?'var(--bl)':'var(--g)',
+ const card0=x=>{const pe=x.status==='pendente',tra=x.status==='recolhido',ea=ent(x),ad=altDest(x),sd=solDest(x),atr=pe&&(Date.now()-new Date(x.quando))>864e5,cor=atr?'var(--r)':pe?'var(--o)':tra?'var(--bl)':'var(--g)',
  tit=pe?(ea?'🚚 ENTREGA AUTORIZADA · ① RETIRAR NO LOCAL':sd?'🔒 DESTINO EM ANÁLISE · RETIRADA TRAVADA':'🔔 RECOLHER MATERIAL'):tra?(ea?(cm?'🚚 RETIRADO PELA LOGÍSTICA · A CAMINHO DO DESTINO':'🚚 RETIRADO · ② LEVAR E ENTREGAR NO DESTINO'):sd?'🚚 RETIRADO · AGUARDANDO APROVAÇÃO DO DESTINO':(cm?'🚚 RECOLHIDO PELA LOGÍSTICA · AGUARDANDO RECEBIMENTO NO CIMI':'🚚 RECOLHIDO · LEVAR AO CIMI (o CIMI confirma o recebimento)')):(ad?'✔ ENTREGUE NO DESTINO AUTORIZADO':'✔ RECEBIDO NO CIMI');
   return`<div class="card" style="margin-bottom:12px;border-left:6px solid ${cor}">
   <div style="font-size:12px;font-weight:700;color:${cor}">${tit}</div>
@@ -249,6 +249,7 @@ function recolHtml(){
   <div>📍 ${esc(x.local||'—')}${x.grupo?` <span class="m">(${esc(x.grupo)})</span>`:''}</div>
   ${x.com?`<div>👷 Com: ${esc(x.com)}</div>`:''}
   <div class="m">Pedido de <strong>${esc(x.solicitante||'—')}</strong> · ${fmt(x.quando)}</div>
+  ${pe?(atr?`<div style="margin:6px 0;padding:8px 10px;border-radius:8px;background:#fdecea;color:#b42318;font-weight:800">🚨 ATRASADO — aguardando retirada há ${haTempo(x.quando)} <span style="font-weight:600">(aberto em ${fmt(x.quando)} · prazo de 24 h excedido)</span></div>`:`<div style="margin:6px 0;padding:6px 10px;border-radius:8px;background:#fff4e5;color:#9a5b00;font-weight:700">⏱ Aguardando retirada há ${haTempo(x.quando)} <span style="font-weight:600">· prazo de execução: 24 h (restam ${haTempo(new Date(2*Date.now()-(new Date(x.quando).getTime()+864e5)))})</span></div>`):''}
   ${x.obs?`<div style="margin-top:6px">💬 ${esc(x.obs)}</div>`:''}
   ${bt(x.foto_pedido,'📷 Foto enviada por quem pediu (onde está / o que recolher)')}
   ${!pe?`<div class="m" style="margin-top:8px">🚚 ${ea||ad?'Retirado':'Recolhido'} por ${esc(x.recolhido_por||'—')} · ${x.recolhido_em?fmt(x.recolhido_em):''}</div>${bt(x.foto,ea||ad?'📷 Foto da retirada no local':'📷 Foto do recolhimento')}`:''}
