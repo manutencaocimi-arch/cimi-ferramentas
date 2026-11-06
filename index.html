@@ -483,12 +483,27 @@ let EXH=null,EXHerr='';
 async function carregaEXH(){try{const {data,error}=await sb.rpc('exec_historico');if(error)throw error;EXH=data||[];EXHerr=''}catch(e){EXH=EXH||[];EXHerr=e.message||String(e)}exView()}
 const exHistHtml=()=>{if(EXH===null){carregaEXH();return'<p class="m">Carregando histórico…</p>'}
  if(EXHerr)return`<div class="card" style="border-left:4px solid var(--r)"><b>Não foi possível carregar o histórico.</b><div class="m">${esc(EXHerr)}</div><button class="btn o" style="margin-top:8px" onclick="carregaEXH()">↻ Tentar de novo</button></div>`;
- return EXH.map(h=>{const ret=h.tipo==='retirada';return`<div class="card" style="margin-bottom:12px;border-left:6px solid ${ret?'var(--o)':'var(--g)'}"><div style="font-size:12px;font-weight:700">${ret?(h.via_logistica?'🚚 RECEBIDA PELA LOGÍSTICA':'📤 RETIRADA'):'📥 DEVOLVIDA AO CIMI'}</div>
+ return EXH.map((h,hi)=>{const ret=h.tipo==='retirada';return`<div class="card" style="margin-bottom:12px;border-left:6px solid ${ret?'var(--o)':'var(--g)'}"><div style="font-size:12px;font-weight:700">${ret?(h.via_logistica?'🚚 RECEBIDA PELA LOGÍSTICA':'📤 RETIRADA'):'📥 DEVOLVIDA AO CIMI'}</div>
   <div style="font-size:18px;font-weight:800;margin:4px 0">${esc(h.ferramenta||'—')} <span class="m">${esc(h.patrimonio||'')}</span></div>
   <div class="m">${fmt(h.quando)}${h.local?(ret?' · 📍 levada para '+esc(h.local):' · 📍 devolvida de '+esc(h.local)):''}</div>
   ${h.via_logistica&&h.conf_status?`<div class="m">${h.conf_status==='confirmada'?'✔ Recebimento confirmado':h.conf_status==='contestada'?'⚠ Divergência informada':'⏳ Aguardando sua confirmação'}</div>`:''}
   ${h.registrado_por?`<div class="m">Registrado por ${esc(h.registrado_por)}</div>`:''}${h.obs?`<div style="margin-top:6px">💬 ${esc(h.obs)}</div>`:''}
-  ${h.foto?`<img class="ph" src="${esc(h.foto)}" onclick="foto('${esc(h.foto)}')" style="margin-top:6px">`:''}</div>`}).join('')||'<p class="m">Nenhuma movimentação registrada para você.</p>'};
+  ${h.foto?`<img class="ph" src="${esc(h.foto)}" onclick="foto('${esc(h.foto)}')" style="margin-top:6px">`:''}
+  <div class="acts" style="margin-top:8px"><button class="btn s" onclick="exHistDet(${hi})">🔎 Detalhes</button></div></div>`}).join('')||'<p class="m">Nenhuma movimentação registrada para você.</p>'};
+function exHistDet(i){const h=(EXH||[])[i];if(!h)return;const ret=h.tipo==='retirada';
+ const row=(l,v)=>v?`<div style="margin:4px 0"><span class="m">${l}</span><br><b>${v}</b></div>`:'';
+ const conf=h.conf_status==='confirmada'?'✔ Recebimento confirmado':h.conf_status==='contestada'?'⚠ Divergência informada':h.conf_status==='pendente'?'⏳ Aguardando confirmação do recebimento':'';
+ const tipo=ret?(h.via_logistica?'🚚 Recebida pela Logística (entrega no local)':'📤 Retirada'):'📥 Devolvida ao CIMI';
+ const fotos=[[h.foto,ret?(h.via_logistica?'Foto da entrega':'Foto da retirada'):'Foto da devolução'],[h.conf_foto||h.conf_foto_url,'Foto do recebimento']].filter(f=>f[0]);
+ const m=document.createElement('div');m.className='mask';m.addEventListener('click',e=>{if(e.target===m)m.remove()});
+ m.innerHTML=`<div class="modal" style="max-width:520px"><h3>🔎 Detalhes da movimentação</h3>
+  <div style="font-size:18px;font-weight:800;margin-bottom:6px">${esc(h.ferramenta||'—')} <span class="m">${esc(h.patrimonio||'')}</span></div>
+  ${row('Tipo',tipo)}${row('Data e hora',h.quando?esc(fmt(h.quando)):'')}${row(ret?'Levada para':'Devolvida de',esc(h.local||''))}
+  ${row('Pessoa',esc(h.pessoa||''))}${row('Levada por (Logística)',esc(h.logistica_nome||''))}${row('Registrado por',esc(h.registrado_por||''))}
+  ${row('Situação do recebimento',conf)}${row('Confirmado por',esc(h.conf_nome||''))}${row('Confirmado em',h.conf_em?esc(fmt(h.conf_em)):'')}
+  ${h.obs?`<div style="margin:4px 0"><span class="m">Observação</span><br>💬 ${esc(h.obs)}</div>`:''}${h.conf_obs?`<div style="margin:4px 0"><span class="m">Observação do recebimento</span><br>💬 ${esc(h.conf_obs)}</div>`:''}
+  ${fotos.length?`<div class="acts" style="margin-top:8px">${fotos.map(f=>`<div style="text-align:center"><img class="ph" style="width:110px;height:110px" src="${esc(f[0])}" onclick="foto('${esc(f[0])}')"><div class="m">${f[1]}</div></div>`).join('')}</div>`:''}
+  <div class="acts" style="margin-top:14px"><button class="btn o" onclick="this.closest('.mask').remove()">Fechar</button></div></div>`;document.body.appendChild(m)}
 const exAtr=r=>r.status==='pendente'&&(Date.now()-new Date(r.quando))>864e5;
 const exPend=()=>(EX?.itens||[]).filter(x=>x.via_logistica&&x.conf_status==='pendente');
 const exSt=s=>s==='pendente'?'🔔 Retirada solicitada — aguardando a Logística':s==='recolhido'?'🚚 Retirada pela Logística — a caminho (CIMI ou destino autorizado)':s==='concluido'?'✔ Concluída — recebida no CIMI ou entregue no destino autorizado':s==='cancelado'?'Cancelada':(s||'—');
