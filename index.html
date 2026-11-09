@@ -277,6 +277,7 @@ function recolHtml(){
  return`${RCerr?`<p class="err">Não foi possível carregar os pedidos: ${esc(RCerr)}</p>`:''}
  <div class="card" style="margin-bottom:14px;background:${alerta?'#fff4e5':'#e9f7ee'};border-color:${alerta?'var(--o)':'var(--g)'};display:flex;align-items:center;gap:10px;flex-wrap:wrap">
   <strong style="font-size:18px;flex:1">${partes.length?partes.join(' · '):'✔ Nenhum pedido pendente'}</strong><button class="btn o" onclick="carregaRC()">↻ Atualizar</button></div>
+  ${cm?'<button class="btn y" style="width:100%;padding:14px;margin:0 0 8px;font-size:16px" onclick="exMaterial()">📸 Pedir recolhimento de material / ferramenta avulsa em outro local</button><div class="m" style="margin-bottom:14px">Use quando houver material em algum local: tire a foto, escolha o local e a Logística recolhe e leva ao CIMI.</div>':''}
  ${secDv}<div class="acts" style="margin-bottom:14px">
   <button class="btn ${rcTab==='pend'?'':'o'}" style="flex:1;padding:12px" onclick="rcGo('pend')">🔔 Solicitações pendentes (${p.length})</button>
   <button class="btn ${rcTab==='and'?'':'o'}" style="flex:1;padding:12px" onclick="rcGo('and')">🧭 Em andamento (${andL.length})</button>
@@ -574,8 +575,8 @@ async function exMaterial(){if(!EXL){try{const {data,error}=await sb.rpc('exec_l
    if(!lc)return er.textContent='Selecione o local onde está o material.';if(mt.length<3)return er.textContent='Informe o que precisa ser retirado.';if(!fl)return er.textContent='Tire a foto do material para enviar o pedido.';
    b.disabled=true;er.textContent='Enviando…';
    try{const url=await exUp(fl);const {data,error}=await sb.rpc('exec_solicitar_material',{p_local:lc,p_material:mt,p_obs:ob,p_foto:url});if(error)throw error;
-    if(data==='ok'||data==='ja_solicitado'){c();EXtab='ped';toast(data==='ok'?'Pedido enviado à Logística ✔':'Esse pedido já foi enviado há poucos minutos');await carregaEX()}
-    else{b.disabled=false;er.textContent=data==='local_invalido'?'Local inválido.':data==='material_obrigatorio'?'Informe o que precisa ser retirado.':data==='foto_obrigatoria'?'A foto é obrigatória.':'Não foi possível enviar ('+data+').'}}
+    if(data==='ok'||data==='ja_solicitado'){c();toast(data==='ok'?'Pedido enviado à Logística ✔':'Esse pedido já foi enviado há poucos minutos');if(me.papel==='executor'){EXtab='ped';await carregaEX()}else{rcTab='pend';await carregaRC()}}
+    else{b.disabled=false;er.textContent=data==='sem_permissao'||data==='nao_autorizado'?'Seu login ainda não tem permissão no servidor para este pedido.':data==='local_invalido'?'Local inválido.':data==='material_obrigatorio'?'Informe o que precisa ser retirado.':data==='foto_obrigatoria'?'A foto é obrigatória.':'Não foi possível enviar ('+data+').'}}
    catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}})}
 function exSolicitar(fid){const x=(EX?.itens||[]).find(i=>i.ferramenta_id===fid);if(!x)return;
  exModal(`<h3>📦 Solicitar retirada</h3><div><strong>${esc(x.nome)}</strong> <span class="m">${esc(x.patrimonio||'')}</span><div class="m">${esc(x.local||'')} → a Logística vai recolher e levar ao CIMI</div></div>
