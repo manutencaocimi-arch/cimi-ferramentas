@@ -49,6 +49,8 @@ th{font-size:12px;text-transform:uppercase;color:var(--m);background:#f8faf9;pos
 .gh{display:flex;align-items:center;gap:10px;margin:22px 0 10px;font-size:17px;font-weight:700;color:var(--c)}.gh:after{content:"";flex:1;height:2px;background:var(--c);opacity:.25;border-radius:2px}
 .lg{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
 .tile{--c:#2e9e4f;background:#fff;border:1px solid var(--b);border-top:4px solid var(--c);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;animation:up .3s both;transition:.18s}
+.krow{display:grid;grid-template-columns:64px 1fr 170px 90px 170px 38px;gap:6px;align-items:center;margin-bottom:6px}.krow.kh{font-size:12px;font-weight:700;color:var(--m);margin:0 0 4px}.krow input,.krow select{padding:8px}
+@media(max-width:700px){.krow{grid-template-columns:60px 1fr 38px}.krow .kt,.krow .ktp{grid-column:span 1}.krow.kh{display:none}}
 .stc{transition:transform .15s,box-shadow .15s}.stc:hover{transform:translateY(-2px);box-shadow:0 6px 16px #0002}.stc.on{outline:2px solid var(--sc);outline-offset:-1px}
 .tile:hover{box-shadow:0 6px 16px #0002;transform:translateY(-2px)}.tile b{font-size:15px}
 .pill{display:inline-block;background:#eef3f0;border-radius:10px;padding:2px 8px;font-size:12px;color:var(--m)}.pill.u{background:var(--o);color:#fff;font-weight:700}.pill.z{background:#e3f3e8;color:var(--gd)}
@@ -914,7 +916,7 @@ const kParse=t=>String(t||'').split(/\r?\n/).map(l=>l.trim().replace(/^[-•*]\s
  return{quantidade:Math.max(1,qt),descricao:d.charAt(0).toUpperCase()+d.slice(1),patrimonio:pat||null}}).filter(x=>x.descricao);
 const kOk=(p,k)=>k==='todos'||(k==='com'&&kIt(p.id).length>0)||(k==='sem'&&!kIt(p.id).length)||(k==='venc'&&kVenc(p.id))||(k==='div'&&kDiv(p.id));
 const kBase=()=>D.p.filter(p=>(p.ativo||kIt(p.id).length)&&(kSel==='todas'||String(p.funcao_id)===String(kSel)));
-const kLista=()=>{const t=q.toLowerCase();return kBase().filter(p=>kOk(p,kFlt)&&`${p.nome} ${kFn(p)} ${kIt(p.id).map(x=>x.descricao+' '+(x.patrimonio||'')).join(' ')}`.toLowerCase().includes(t)).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'))};
+const kLista=()=>{const t=q.toLowerCase();return kBase().filter(p=>kOk(p,kFlt)&&`${p.nome} ${kFn(p)} ${kIt(p.id).map(x=>x.descricao+' '+(x.patrimonio||'')+' '+(x.tipo||'')).join(' ')}`.toLowerCase().includes(t)).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'))};
 
 function kits(){
  if(D.kErr)return`<div class="card" style="border-left:6px solid var(--o)"><b>⚠ A aba Kits ainda não foi ativada no banco de dados.</b><div class="m" style="margin-top:6px">Rode o arquivo <b>kits_pessoais.sql</b> no Supabase (SQL Editor → New query → colar → Run) e depois atualize esta página com Ctrl+F5.</div><div class="m" style="margin-top:6px">Detalhe técnico: ${esc(D.kErr)}</div></div>`;
@@ -948,9 +950,9 @@ function kitVer(pid){const p=kP(pid);if(!p)return;const it=kIt(pid),en=kEnc(pid)
  <div><h3 style="margin:0">🎒 Kit de ${esc(p.nome)}</h3><div class="m">${kIc(fn)} ${esc(fn)} · ${it.length} ${it.length===1?'item':'itens'} · ${kUn(it)} unidade(s)</div></div></div>
  <div style="margin:10px 0">${kConfTag(pid)}</div>
  <div class="acts" style="margin-bottom:10px"><button class="btn" onclick="kitAdd('${p.id}')">+ Adicionar itens</button>${it.length?`<button class="btn y" onclick="kitConferir('${p.id}')">✔ Fazer conferência</button><button class="btn o" onclick="kitTermo('${p.id}')">🖨 Termo de responsabilidade</button>`:''}</div>
- <div class="tw"><table><tr><th>Qtd</th><th>Item</th><th>Patrimônio / Nº</th><th>Estado</th><th>Com a pessoa desde</th><th>Última conferência</th><th>Ações</th></tr>
- ${it.map(x=>`<tr><td><b>${x.quantidade}</b></td><td><b>${esc(x.descricao)}</b>${x.obs?`<div class="m">${esc(x.obs)}</div>`:''}</td><td>${esc(x.patrimonio||'—')}</td><td>${x.estado==='ruim'?'<b style="color:var(--r)">'+esc(KEST[x.estado])+'</b>':esc(KEST[x.estado]||x.estado||'—')}</td><td>${kDt(x.entregue_em)}<div class="m">${esc(x.entregue_por||'')}</div></td><td>${sit(x)}</td>
- <td><div class="acts" style="flex-wrap:nowrap"><button class="btn s o" title="Editar item" onclick="kitEdit('${x.id}')">✏️</button><button class="btn s o" title="Devolver ao CIMI, dar baixa ou passar para outra pessoa" onclick="kitDevolver('${x.id}')">↩ Tirar do kit</button>${me.papel==='principal'?`<button class="btn s o" style="color:#c0392b;border-color:#c0392b" title="Excluir lançamento errado" onclick="kitExcluir('${x.id}')">🗑</button>`:''}</div></td></tr>`).join('')||'<tr><td colspan=7 class="m">Nenhum item no kit desta pessoa. Clique em “+ Adicionar itens”.</td></tr>'}</table></div>
+ <div class="tw"><table><tr><th>Qtd</th><th>Item</th><th>Tipo</th><th>Patrimônio</th><th>Estado</th><th>Com a pessoa desde</th><th>Última conferência</th><th>Ações</th></tr>
+ ${it.map(x=>`<tr><td><b>${x.quantidade}</b></td><td><b>${esc(x.descricao)}</b>${x.obs?`<div class="m">${esc(x.obs)}</div>`:''}</td><td style="white-space:nowrap">${esc(kTipoTxt(x.tipo))}</td><td>${esc(kPatTxt(x))}</td><td>${x.estado==='ruim'?'<b style="color:var(--r)">'+esc(KEST[x.estado])+'</b>':esc(KEST[x.estado]||x.estado||'—')}</td><td>${kDt(x.entregue_em)}<div class="m">${esc(x.entregue_por||'')}</div></td><td>${sit(x)}</td>
+ <td><div class="acts" style="flex-wrap:nowrap"><button class="btn s o" title="Editar item" onclick="kitEdit('${x.id}')">✏️</button><button class="btn s o" title="Devolver ao CIMI, dar baixa ou passar para outra pessoa" onclick="kitDevolver('${x.id}')">↩ Tirar do kit</button>${me.papel==='principal'?`<button class="btn s o" style="color:#c0392b;border-color:#c0392b" title="Excluir lançamento errado" onclick="kitExcluir('${x.id}')">🗑</button>`:''}</div></td></tr>`).join('')||'<tr><td colspan=8 class="m">Nenhum item no kit desta pessoa. Clique em “+ Adicionar itens”.</td></tr>'}</table></div>
  ${cf.length?`<h4 style="margin:18px 0 6px">✔ Conferências (${cf.length})</h4>${cf.slice(0,10).map(k=>{const pr=(k.itens||[]).filter(y=>y.sit!=='ok');
   return`<div class="tl" style="border-left-color:${k.resultado==='ok'?'var(--g)':'var(--r)'}"><b>${k.resultado==='ok'?'✔ Tudo conferido':'⚠ Divergência'}</b> <span class="m">· ${fmt(k.created_at)} · por ${esc(k.usuario_nome||'—')} · ${(k.itens||[]).length} item(ns) conferido(s)</span>
   ${pr.map(y=>`<div class="m">${y.sit==='falta'?'✖ Faltando':'⚠ Danificado'}: <b>${esc(y.nome)}</b>${y.obs?' — '+esc(y.obs):''}</div>`).join('')}${k.obs?`<div>💬 ${esc(k.obs)}</div>`:''}${k.foto_url?`<img class="ph" style="margin-top:6px" src="${esc(k.foto_url)}" onclick="foto('${esc(k.foto_url)}')">`:''}</div>`}).join('')}`:''}
@@ -958,31 +960,63 @@ function kitVer(pid){const p=kP(pid);if(!p)return;const it=kIt(pid),en=kEnc(pid)
  <button class="btn o" style="margin-top:14px" onclick="this.closest('.mask').remove()">Fechar</button></div>`;
  document.body.appendChild(m)}
 
-function kitAdd(pid){const p=pid?kP(pid):null;
- form(p?`🎒 Adicionar itens ao kit de ${esc(p.nome)}`:'🎒 Adicionar itens a um kit',[
-  ...(p?[]:[{k:'pid',l:'👷 Pessoa responsável pelo kit',t:'select',opts:kPesOpts()}]),
-  {k:'lista',l:'Itens — um por linha, com a quantidade na frente.<div class="m" style="font-weight:400">Ex.: <b>1 facão</b> · <b>2 enxadas</b> · <b>1 roçadeira Stihl 220 | PAT 12345</b> (depois da barra | vai o patrimônio ou nº de série, se tiver). Pode colar a lista inteira do WhatsApp.</div>',t:'area'},
-  {k:'estado',l:'Estado dos itens na entrega',t:'select',value:'bom',opts:Object.entries(KEST)},
-  {k:'data',l:'Data em que a pessoa recebeu',t:'date',value:kHoje()},
-  {k:'entregue',l:'Entregue por',value:me.nome},
-  {k:'obs',l:'Observação (opcional — vale para todos os itens desta lista)',t:'area'}],'Adicionar ao kit',async v=>{
-  const id=p?p.id:v.pid;if(!id)return'Escolha a pessoa.';const it=kParse(v.lista);if(!it.length)return'Digite ao menos um item.';
-  const dt=v.data?new Date(v.data+'T12:00:00').toISOString():new Date().toISOString();
-  const {error}=await sb.from('kit_itens').insert(it.map(x=>({...x,pessoa_id:id,estado:v.estado||'bom',obs:v.obs||null,status:'com_pessoa',entregue_em:dt,entregue_por:v.entregue||me.nome,usuario_id:me.id,usuario_nome:me.nome})));if(error)throw error;
-  kReabre=id;toast(`${it.length} ${it.length===1?'item adicionado':'itens adicionados'} ao kit ✔`)});
- const m=document.body.lastElementChild,ta=m.querySelector('[name=lista]');m.querySelector('.modal').style.maxWidth='560px';ta.rows=9;ta.placeholder='1 facão\n1 tesourão\n1 tesoura de paisagismo pequena\n2 enxadas';
- const pv=document.createElement('div');pv.className='m';pv.style.marginTop='4px';ta.after(pv);
- ta.oninput=()=>{const it=kParse(ta.value);pv.innerHTML=it.length?`✔ Serão adicionados <b>${it.length}</b> ${it.length===1?'item':'itens'} (${kUn(it)} unidade(s)): ${esc(it.map(kNome).join(' · '))}`:''};ta.focus()}
+const KTIPOS=[...USOS.map(u=>[u[0],u[1]+' '+u[0]]),['Outro','📦 Outro / uso geral']];
+const kTipoDe=p=>{const n=kFn(p);return /jardin/i.test(n)?'Jardinagem':/pintor|pintura/i.test(n)?'Pintura':/manuten/i.test(n)?'Manutenção':''};
+const kTipoTxt=t=>{const o=KTIPOS.find(x=>x[0]===t);return o?o[1]:(t||'—')};
+const kPatTxt=x=>x.tem_patrimonio||x.patrimonio?('Sim'+(x.patrimonio?' · '+x.patrimonio:'')):'Não';
+function kitAdd(pid){const p0=pid?kP(pid):null;
+ const m=document.createElement('div');m.className='mask';
+ const opt=(a,v)=>a.map(o=>`<option value="${esc(o[0])}" ${String(o[0])===String(v)?'selected':''}>${esc(o[1])}</option>`).join('');
+ const pesSel=()=>{let h='',g=null;kPesOpts().forEach(o=>{if(o[2]!==g){if(g!==null&&g!==undefined)h+='</optgroup>';g=o[2];if(g!==undefined)h+=`<optgroup label="${esc(g)}">`}h+=`<option value="${esc(o[0])}">${esc(o[1])}</option>`});return h+(g!==undefined&&g!==null?'</optgroup>':'')};
+ m.innerHTML=`<div class="modal" style="max-width:880px"><h3>🎒 ${p0?'Adicionar itens ao kit de '+esc(p0.nome):'Adicionar itens a um kit'}</h3>
+ ${p0?'':`<label>👷 Pessoa responsável pelo kit</label><select id="kpid">${pesSel()}</select>`}
+ <label>Itens do kit</label>
+ <div class="krow kh"><span>Qtd</span><span>Item</span><span>Tipo de material</span><span>Tem patrimônio?</span><span>Nº do patrimônio / série</span><span></span></div>
+ <div id="krows"></div>
+ <div class="acts" style="margin-top:6px"><button class="btn s o" id="kadd">+ Adicionar outro item</button><button class="btn s o" id="kcolar">📋 Colar lista do WhatsApp</button></div>
+ <div id="kcbox" style="display:none;margin-top:8px"><textarea id="kcta" rows="6" placeholder="1 facão\n1 tesourão\n2 enxadas\n1 roçadeira Stihl 220 | PAT 4521"></textarea>
+ <div class="m">Um item por linha, com a quantidade na frente. Se o item tiver patrimônio, escreva depois da barra |. Depois confira o tipo e o patrimônio de cada linha.</div><button class="btn s" id="kcok" style="margin-top:6px">Transformar em linhas</button></div>
+ <label>Estado dos itens na entrega</label><select id="kest">${opt(Object.entries(KEST),'bom')}</select>
+ <label>Data em que a pessoa recebeu</label><input type="date" id="kdt" value="${kHoje()}">
+ <label>Entregue por</label><input id="kent" value="${esc(me.nome)}">
+ <label>Observação (opcional — vale para todos os itens desta lista)</label><textarea id="kob" rows="2"></textarea>
+ <div class="m" id="kres" style="margin-top:8px"></div><div class="err" id="ker"></div>
+ <div class="acts" style="margin-top:14px"><button class="btn" id="ksv">Adicionar ao kit</button><button class="btn o" id="kno">Cancelar</button></div></div>`;
+ document.body.appendChild(m);
+ const box=m.querySelector('#krows'),$m=s=>m.querySelector(s),tipoPad=()=>kTipoDe(p0||kP($m('#kpid')?.value))||'';
+ const rows=()=>[...box.querySelectorAll('.krow')].map(r=>({r,qt:parseInt(r.querySelector('.kq').value),d:r.querySelector('.kd').value.trim(),t:r.querySelector('.kt').value,tp:r.querySelector('.ktp').value==='sim',n:r.querySelector('.kn').value.trim()}));
+ const resumo=()=>{const v=rows().filter(x=>x.d);$m('#kres').innerHTML=v.length?`✔ ${v.length} ${v.length===1?'item':'itens'} · ${v.reduce((s,x)=>s+(x.qt>0?x.qt:0),0)} unidade(s) · ${v.filter(x=>x.tp).length} com patrimônio`:''};
+ const add=(o={})=>{const r=document.createElement('div');r.className='krow';
+  r.innerHTML=`<input class="kq" type="number" min="1" value="${o.quantidade||1}" title="Quantidade"><input class="kd" placeholder="Ex.: Facão" value="${esc(o.descricao||'')}"><select class="kt"><option value="">— Tipo —</option>${opt(KTIPOS,o.tipo??tipoPad())}</select>
+  <select class="ktp">${opt([['nao','Não'],['sim','Sim']],o.patrimonio?'sim':'nao')}</select><input class="kn" placeholder="Nº do patrimônio" value="${esc(o.patrimonio||'')}"><button class="btn s o kx" title="Remover esta linha" style="color:#c0392b;border-color:#c0392b">✕</button>`;
+  const tp=r.querySelector('.ktp'),n=r.querySelector('.kn'),tg=()=>{n.style.visibility=tp.value==='sim'?'visible':'hidden'};tp.onchange=()=>{tg();if(tp.value==='sim')n.focus();resumo()};tg();
+  r.querySelector('.kx').onclick=()=>{r.remove();if(!box.children.length)add();resumo()};r.oninput=resumo;box.appendChild(r);return r};
+ add();box.querySelector('.kd').focus();
+ if($m('#kpid'))$m('#kpid').onchange=()=>{const t=tipoPad();if(t)box.querySelectorAll('.kt').forEach(s=>{if(!s.value)s.value=t})};
+ $m('#kadd').onclick=()=>{add().querySelector('.kd').focus()};
+ $m('#kcolar').onclick=()=>{const b=$m('#kcbox');b.style.display=b.style.display==='none'?'':'none';$m('#kcta').focus()};
+ $m('#kcok').onclick=()=>{const it=kParse($m('#kcta').value);if(!it.length)return;rows().filter(x=>!x.d).forEach(x=>x.r.remove());it.forEach(x=>add(x));$m('#kcta').value='';$m('#kcbox').style.display='none';resumo()};
+ $m('#kno').onclick=()=>m.remove();
+ $m('#ksv').onclick=async e=>{const b=e.target,er=$m('#ker');er.textContent='';
+  const id=p0?p0.id:$m('#kpid').value;if(!id)return er.textContent='Escolha a pessoa responsável pelo kit.';
+  const v=rows().filter(x=>x.d);if(!v.length)return er.textContent='Preencha ao menos um item.';
+  for(const x of v){if(!(x.qt>0))return er.textContent=`Quantidade inválida em "${x.d}".`;if(!x.t)return er.textContent=`Escolha o tipo de material de "${x.d}".`;if(x.tp&&!x.n)return er.textContent=`Informe o nº do patrimônio de "${x.d}" (ou marque "Não").`}
+  const dv=$m('#kdt').value,dt=dv?new Date(dv+'T12:00:00').toISOString():new Date().toISOString();
+  b.disabled=true;
+  try{const {error}=await sb.from('kit_itens').insert(v.map(x=>({pessoa_id:id,descricao:x.d.charAt(0).toUpperCase()+x.d.slice(1),quantidade:x.qt,tipo:x.t,tem_patrimonio:x.tp,patrimonio:x.tp?x.n:null,estado:$m('#kest').value||'bom',obs:$m('#kob').value.trim()||null,status:'com_pessoa',entregue_em:dt,entregue_por:$m('#kent').value.trim()||me.nome,usuario_id:me.id,usuario_nome:me.nome})));
+   if(error)throw error;m.remove();kReabre=id;toast(`${v.length} ${v.length===1?'item adicionado':'itens adicionados'} ao kit ✔`);await load();render()}
+  catch(x){b.disabled=false;er.textContent='Erro: '+(x.message||x)+(/column|tipo|tem_patrimonio/i.test(x.message||'')?' — rode o arquivo kits_atualizacao_tipo_patrimonio.sql no Supabase.':'')}}}
 
 function kitEdit(id){const x=(D.ki||[]).find(y=>String(y.id)===String(id));if(!x)return;const p=kP(x.pessoa_id);
- form(`✏️ Editar item do kit de ${esc(p?.nome||'')}`,[{k:'descricao',l:'Item',value:x.descricao},{k:'quantidade',l:'Quantidade',t:'number',value:x.quantidade},{k:'patrimonio',l:'Patrimônio / nº de série (opcional)',value:x.patrimonio},
+ form(`✏️ Editar item do kit de ${esc(p?.nome||'')}`,[{k:'descricao',l:'Item',value:x.descricao},{k:'quantidade',l:'Quantidade',t:'number',value:x.quantidade},{k:'tipo',l:'Tipo de material',t:'select',value:x.tipo||'',opts:[['','— Tipo —'],...KTIPOS]},{k:'tem_patrimonio',l:'Tem patrimônio?',t:'select',value:(x.tem_patrimonio||x.patrimonio)?'sim':'nao',opts:[['nao','Não'],['sim','Sim']]},{k:'patrimonio',l:'Nº do patrimônio / série',value:x.patrimonio},
   {k:'estado',l:'Estado',t:'select',value:x.estado||'bom',opts:Object.entries(KEST)},{k:'obs',l:'Observação',t:'area',value:x.obs},pwField],'Salvar edição',async v=>{
-  if(!v.descricao)return'Informe o item.';const qt=parseInt(v.quantidade);if(!(qt>0))return'Quantidade inválida.';v.quantidade=qt;
+  if(!v.descricao)return'Informe o item.';const qt=parseInt(v.quantidade);if(!(qt>0))return'Quantidade inválida.';v.quantidade=qt;if(!v.tipo)return'Escolha o tipo de material.';v.tem_patrimonio=v.tem_patrimonio==='sim';if(v.tem_patrimonio&&!v.patrimonio)return'Informe o nº do patrimônio (ou marque "Não").';if(!v.tem_patrimonio)v.patrimonio='';
   if(!await checkPw(v.senha))return'Senha incorreta.';const n={},diffs=[];
-  ['descricao','quantidade','patrimonio','estado','obs'].forEach(k=>{if(String(x[k]??'')!==String(v[k]??'')){diffs.push([k==='descricao'?'item':k,x[k],v[k]]);n[k]=v[k]===''?null:v[k]}});
+  x.tem_patrimonio=!!(x.tem_patrimonio||x.patrimonio);['descricao','quantidade','tipo','tem_patrimonio','patrimonio','estado','obs'].forEach(k=>{if(String(x[k]??'')!==String(v[k]??'')){diffs.push([k==='descricao'?'item':k==='tem_patrimonio'?'tem patrimônio':k,k==='tem_patrimonio'?(x[k]?'Sim':'Não'):x[k],k==='tem_patrimonio'?(v[k]?'Sim':'Não'):v[k]]);n[k]=v[k]===''?null:v[k]}});
   if(!diffs.length)return'Nada foi alterado.';
   const {data,error}=await sb.from('kit_itens').update(n).eq('id',x.id).select();if(error)throw error;if(!data?.length)return'Seu login não tem permissão para editar kits.';
-  await logEdit('kits',(p?.nome||'')+' — '+x.descricao,diffs);kReabre=x.pessoa_id;toast('Item atualizado ✔')})}
+  await logEdit('kits',(p?.nome||'')+' — '+x.descricao,diffs);kReabre=x.pessoa_id;toast('Item atualizado ✔')});
+ const m=document.body.lastElementChild,tp=m.querySelector('[name=tem_patrimonio]'),pt=m.querySelector('[name=patrimonio]');const tg=()=>{pt.previousElementSibling.style.display=pt.style.display=tp.value==='sim'?'':'none'};tp.onchange=tg;tg()}
 
 function kitDevolver(id){const x=(D.ki||[]).find(y=>String(y.id)===String(id));if(!x)return;const p=kP(x.pessoa_id),qmax=+x.quantidade||1;
  form(`↩ Tirar do kit: ${esc(kNome(x))}`,[{k:'acao',l:'O que aconteceu com o item?',t:'select',value:'devolvido',opts:Object.entries(KENC)},
@@ -995,9 +1029,9 @@ function kitDevolver(id){const x=(D.ki||[]).find(y=>String(y.id)===String(id));i
   if(!await checkPw(v.senha))return'Senha incorreta.';
   const enc={status:v.acao,encerrado_em:new Date().toISOString(),encerrado_por:me.nome,encerrado_obs:v.obs||null,transferido_para:pp?.id||null};let r;
   if(qt<qmax){r=await sb.from('kit_itens').update({quantidade:qmax-qt}).eq('id',x.id).select();if(r.error)throw r.error;if(!r.data?.length)return'Seu login não tem permissão para alterar kits.';
-   r=await sb.from('kit_itens').insert({pessoa_id:x.pessoa_id,descricao:x.descricao,quantidade:qt,patrimonio:x.patrimonio,estado:x.estado,obs:x.obs,entregue_em:x.entregue_em,entregue_por:x.entregue_por,usuario_id:me.id,usuario_nome:me.nome,...enc});if(r.error)throw r.error}
+   r=await sb.from('kit_itens').insert({pessoa_id:x.pessoa_id,descricao:x.descricao,quantidade:qt,tipo:x.tipo,tem_patrimonio:!!(x.tem_patrimonio||x.patrimonio),patrimonio:x.patrimonio,estado:x.estado,obs:x.obs,entregue_em:x.entregue_em,entregue_por:x.entregue_por,usuario_id:me.id,usuario_nome:me.nome,...enc});if(r.error)throw r.error}
   else{r=await sb.from('kit_itens').update(enc).eq('id',x.id).select();if(r.error)throw r.error;if(!r.data?.length)return'Seu login não tem permissão para alterar kits.'}
-  if(pp){r=await sb.from('kit_itens').insert({pessoa_id:pp.id,descricao:x.descricao,quantidade:qt,patrimonio:x.patrimonio,estado:x.estado,obs:'Recebido de '+(p?.nome||'—')+(v.obs?' · '+v.obs:''),status:'com_pessoa',entregue_em:new Date().toISOString(),entregue_por:me.nome,usuario_id:me.id,usuario_nome:me.nome});if(r.error)throw r.error}
+  if(pp){r=await sb.from('kit_itens').insert({pessoa_id:pp.id,descricao:x.descricao,quantidade:qt,tipo:x.tipo,tem_patrimonio:!!(x.tem_patrimonio||x.patrimonio),patrimonio:x.patrimonio,estado:x.estado,obs:'Recebido de '+(p?.nome||'—')+(v.obs?' · '+v.obs:''),status:'com_pessoa',entregue_em:new Date().toISOString(),entregue_por:me.nome,usuario_id:me.id,usuario_nome:me.nome});if(r.error)throw r.error}
   await logEdit('kits',(p?.nome||'')+' — '+x.descricao,[['kit',`${qmax}× com ${p?.nome||'—'}`,`${qt}× ${KENC[v.acao]}${pp?' ('+pp.nome+')':''}${v.obs?' · '+v.obs:''}`]]);
   kReabre=x.pessoa_id;toast(v.acao==='transferido'?`Item passado para o kit de ${pp.nome} ✔`:'Registrado ✔')});
  const m=document.body.lastElementChild,ac=m.querySelector('[name=acao]'),pa=m.querySelector('[name=para]');
@@ -1038,7 +1072,7 @@ function kitTermo(pid){const p=kP(pid),it=kIt(pid);if(!p)return;const fn=kFn(p),
  w.document.open();w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Termo de responsabilidade - ${e(p.nome)}</title><style>body{font:13px Arial,sans-serif;margin:24px;color:#111}h1{font-size:18px;margin:0 0 4px}.s{color:#555;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0}th,td{border:1px solid #999;padding:6px;text-align:left}th{background:#2e9e4f;color:#fff}p{line-height:1.5}.as{display:flex;gap:40px;margin-top:60px}.as div{flex:1;border-top:1px solid #111;padding-top:6px;text-align:center}@page{size:A4;margin:14mm}</style></head><body>
  <h1>CIMI · Termo de responsabilidade — kit de ferramentas</h1><div class="s">Gerado em ${e(fmt(new Date()))} por ${e(me.nome)}</div>
  <p><b>Colaborador:</b> ${e(p.nome)}<br><b>Função:</b> ${e(fn)}</p>
- <table><thead><tr><th>Qtd</th><th>Item</th><th>Patrimônio / Nº</th><th>Estado</th><th>Recebido em</th></tr></thead><tbody>${it.map(x=>`<tr><td>${e(x.quantidade)}</td><td>${e(x.descricao)}</td><td>${e(x.patrimonio||'—')}</td><td>${e(KEST[x.estado]||'')}</td><td>${e(kDt(x.entregue_em))}</td></tr>`).join('')}</tbody></table>
+ <table><thead><tr><th>Qtd</th><th>Item</th><th>Tipo</th><th>Patrimônio</th><th>Estado</th><th>Recebido em</th></tr></thead><tbody>${it.map(x=>`<tr><td>${e(x.quantidade)}</td><td>${e(x.descricao)}</td><td>${e(x.tipo||'—')}</td><td>${e(kPatTxt(x))}</td><td>${e(KEST[x.estado]||'')}</td><td>${e(kDt(x.entregue_em))}</td></tr>`).join('')}</tbody></table>
  <p>Total: <b>${it.length}</b> ${it.length===1?'item':'itens'} (${kUn(it)} unidades).</p>
  <p>Declaro que recebi as ferramentas relacionadas acima para uso nas minhas atividades de ${e(fn.toLowerCase())} e me comprometo a: zelar pela guarda e conservação delas; usá-las somente no serviço; comunicar imediatamente à coordenação qualquer perda, furto ou dano; apresentá-las sempre que houver conferência; e devolvê-las ao CIMI quando solicitado ou em caso de mudança de função ou desligamento.</p>
  <p>Local e data: ______________________________, ____/____/________</p>
@@ -1046,9 +1080,9 @@ function kitTermo(pid){const p=kP(pid),it=kIt(pid);if(!p)return;const fn=kFn(p),
  w.document.close();w.focus();setTimeout(()=>w.print(),400)}
 
 function kitRel(tipo){const ps=kLista();if(!ps.length)return toast('Nenhuma pessoa no filtro atual.');const w=tipo==='print'?window.open('','_blank'):null;if(tipo==='print'&&!w)return toast('Libere as janelas pop-up deste site para imprimir.');
- const head=['Pessoa','Qtd','Item','Patrimônio / Nº','Estado','Com a pessoa desde','Última conferência'];
+ const head=['Pessoa','Qtd','Item','Tipo','Patrimônio','Estado','Com a pessoa desde','Última conferência'];
  const linhas=p=>{const u=kUlt(p.id),uc=u?kDt(u.created_at)+(u.resultado==='ok'?' (OK)':' (divergência)'):'Nunca conferido',it=kIt(p.id);
-  return it.length?it.map(x=>[p.nome,x.quantidade,x.descricao,x.patrimonio||'',KEST[x.estado]||'',kDt(x.entregue_em),uc]):[[p.nome,'','(sem kit)','','','','']]};
+  return it.length?it.map(x=>[p.nome,x.quantidade,x.descricao,x.tipo||'',kPatTxt(x),KEST[x.estado]||'',kDt(x.entregue_em),uc]):[[p.nome,'','(sem kit)','','','','','']]};
  const fns=[...new Set(ps.map(kFn))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
  const blocos=fns.map(f=>({t:f,head,rows:ps.filter(p=>kFn(p)===f).flatMap(linhas)}));
  const fl={todos:'',com:' · somente com kit',sem:' · somente sem kit',venc:' · conferência pendente',div:' · com divergência'}[kFlt]||'';
