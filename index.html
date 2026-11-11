@@ -117,6 +117,9 @@ const cargoTag=u=>{const c=CG[u.id];if(c)return`<span class="pill u">${esc(c.car
  const nm=x=>String(x||'').trim().toLowerCase(),pe=(D.p||[]).find(x=>x.usuario_id===u.id)||(D.p||[]).find(x=>nm(x.nome)&&nm(x.nome)===nm(u.nome));
  const f=pe&&FN(pe.funcao_id)?.nome;return f?`<span class="pill u">${esc(f)}</span>`:'—'};
 const CARGOS=['ADM','Coordenador','Supervisor','Assistente/Encarregado','Jovem Aprendiz'];
+// Editar/Excluir pedidos ainda não retirados: ADM, Coordenador, Supervisor e Assistente/Encarregado (o banco confere de novo)
+const podeGerir=()=>!!me&&(me.papel==='principal'||(me.papel==='correlato'&&['ADM','Coordenador','Supervisor','Assistente/Encarregado'].includes(meCargo())));
+const gerirBtns=id=>podeGerir()?`<div class="acts" style="margin-top:8px"><button class="btn o" style="flex:1" onclick="pedidoEditar('${id}')">✏️ Editar pedido</button><button class="btn r" style="flex:1" onclick="pedidoExcluir('${id}')">🗑 Excluir pedido</button></div>`:'';
 function cargoAC(id){const u=AC.find(x=>x.id===id);if(!u)return;
  form(`Cargo: ${esc(loginDe(u))}`,[{k:'cargo',l:'Cargo (ADM, Coordenador e Supervisor aprovam mudança de destino)',t:'select',value:CG[id]?.cargo||'',opts:[['','— Sem cargo —'],...CARGOS.map(c=>[c,c])]},
   {k:'ordem',l:'Posição na lista de acessos (1 = primeiro)',value:CG[id]?.ordem??''},pwField],'Salvar cargo',async v=>{
@@ -255,6 +258,7 @@ function recolHtml(){
   ${!pe?`<div class="m" style="margin-top:8px">🚚 ${ea||ad?'Retirado':'Recolhido'} por ${esc(x.recolhido_por||'—')} · ${x.recolhido_em?fmt(x.recolhido_em):''}</div>${bt(x.foto,ea||ad?'📷 Foto da retirada no local':'📷 Foto do recolhimento')}`:''}
   ${x.status==='concluido'&&!ad?`<div class="m" style="margin-top:8px">📥 Recebido no CIMI por ${esc(x.recebido_por||'—')} · ${x.recebido_em?fmt(x.recebido_em):''}</div>${x.recebido_obs?`<div>💬 ${esc(x.recebido_obs)}</div>`:''}${bt(x.recebido_foto,'📷 Foto do recebimento no CIMI')}`:''}
   ${pe&&pode&&!sd?`<button class="btn" style="width:100%;margin-top:12px;padding:14px;font-size:16px" onclick="recolher('${x.id}')">${ea?'📷 ① Retirei no local — enviar foto':'📷 Recolhi — enviar foto'}</button>`:''}
+  ${pe?gerirBtns(x.id):''}
   ${pe&&sd?`<div class="m" style="margin-top:10px;padding:10px;border-radius:8px;background:#fff4e5;border:1px solid var(--o)">🔒 <strong>Retirada travada</strong> — aguardando a autorização de Supervisor, Coordenador ou ADM. Só retire o material depois da aprovação.</div>`:''}
   ${pe&&!pode&&!sd?`<div class="m" style="margin-top:8px">⏳ Aguardando a Logística ${ea?'retirar e entregar':'recolher'}.</div>`:''}
   ${tra&&cm&&!ea&&!sd?`<button class="btn" style="width:100%;margin-top:12px;padding:14px;font-size:16px" onclick="cimiReceber('${x.id}')">📥 Recebi no CIMI — enviar foto e dar baixa</button>`:''}
@@ -276,6 +280,7 @@ function recolHtml(){
   ${!pe?`<div class="m" style="margin-top:8px">🚚 ${tf?'Recolhido':'Retirado na CIMI'} por ${esc(x.recolhido_por||'—')} · ${x.recolhido_em?fmt(x.recolhido_em):''}</div>${bt(x.foto,tf?'📷 Foto do recolhimento':'📷 Foto da retirada na CIMI')}`:''}
   ${fim?`<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#e9f7ee"><div>✔ Entregue por <b>${esc(x.ent_por||'—')}</b> · ${x.ent_em?fmt(x.ent_em):''}</div><div>📌 <b>Deixado em:</b> ${esc(x.ent_onde||'—')}</div>${x.ent_obs?`<div>💬 ${esc(x.ent_obs)}</div>`:''}</div>${bt(x.ent_foto,'📷 Foto do material deixado no local')}`:''}
   ${pe&&pode?`<button class="btn" style="width:100%;margin-top:12px;padding:14px;font-size:16px" onclick="fluxoRetirar('${x.id}')">${tf?'📷 ① Recolhi — enviar foto':'📦 ① Retirei na CIMI'}</button>`:''}
+  ${pe?gerirBtns(x.id):''}
   ${tra&&pode?`<button class="btn" style="width:100%;margin-top:12px;padding:14px;font-size:16px" onclick="fluxoEntregar('${x.id}')">📷 ② Deixei no local — foto e onde deixei</button>`:''}
   ${(pe||tra)&&!pode?`<div class="m" style="margin-top:8px">⏳ ${pe?'Aguardando a Logística '+(tf?'recolher':'retirar na CIMI')+'.':'A Logística está a caminho do destino para deixar o material.'}</div>`:''}</div>`};
   const andL=RC.filter(x=>(x.status==='recolhido'&&!(!ent(x)&&!solDest(x)))||(x.status==='concluido'&&x.dv&&x.dv.entregue_em&&x.dv.token&&x.dv.conf_status!=='confirmada')).sort((a,b)=>new Date(b.recolhido_em||b.quando||0)-new Date(a.recolhido_em||a.quando||0));
@@ -641,6 +646,41 @@ function fluxoEntregar(id){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
    try{const url=await fxUp(fl,id);const {data,error}=await sb.rpc('fluxo_entregar',{p_id:id,p_foto:url,p_onde:on,p_obs:ob});if(error)throw error;
     if(data==='ok'||data==='ja_entregue'){c();toast(data==='ok'?'Entrega registrada ✔':'Este pedido já havia sido entregue');await carregaRC()}
     else{b.disabled=false;er.textContent=fxErr(data)}}
+   catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}})}
+
+// ---------- Editar / Excluir pedido ainda não retirado ----------
+const GMSG={sem_permissao:'Seu usuário não tem permissão (apenas ADM, Coordenador, Supervisor e Assistente/Encarregado).',ja_iniciado:'A Logística já retirou este pedido; não dá mais para alterar ou excluir.',invalido:'Pedido não encontrado.',motivo_obrigatorio:'Informe o motivo da exclusão.'};
+function pedidoExcluir(id){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
+ form(`🗑 Excluir pedido: ${esc(x.ferramenta||'Pedido')}`,[{k:'aviso',l:'<b style="color:#c0392b">Atenção:</b> o pedido sai da fila da Logística. Só é possível enquanto ninguém retirou. Fica registrado em Edições.',t:'hidden',value:''},{k:'motivo',l:'Motivo da exclusão (obrigatório)'},pwField],'Excluir pedido',async v=>{
+  if((v.motivo||'').trim().length<3)return'Informe o motivo da exclusão.';
+  if(!await checkPw(v.senha))return'Senha incorreta.';
+  const {data,error}=await sb.rpc('fluxo_cancelar_pedido',{p_id:id,p_motivo:v.motivo});if(error)throw error;
+  if(data!=='ok')return GMSG[data]||('Não foi possível excluir ('+data+'). Confirme que o SQL de editar/excluir foi executado.');
+  await logEdit('recolhimentos',(x.ferramenta||'Pedido')+' · '+(x.local||''),[['pedido','pendente','excluído: '+v.motivo.trim()]]);await load();await carregaRC();toast('Pedido excluído ✔')})}
+function pedidoEditar(id){const r=(D.rc||[]).find(y=>y.id===id),x=(RC||[]).find(y=>y.id===id);if(!r||!x)return toast('Atualize a página e tente de novo.');
+ const tp=r.tipo||'recolher',avulso=!r.ferramenta_id,lo=sel=>'<option value="">— Selecione —</option>'+localOpts(sel,false);
+ const lista=Array.isArray(r.itens)?r.itens:[];
+ const linha=(i={})=>`<div class="lr" style="display:flex;gap:6px;align-items:center;margin:6px 0;flex-wrap:wrap"><select class="lc" style="width:130px"><option value="">Categoria</option>${['Pintura','Jardinagem','Manutenção'].map(c=>`<option ${i.cat===c?'selected':''}>${c}</option>`).join('')}</select><input class="ld" value="${esc(i.desc||'')}" placeholder="Material" style="flex:1;min-width:150px"><input class="lq" value="${esc(i.qtd||'')}" placeholder="Qtd" style="width:70px"><button class="btn s o" type="button" onclick="this.closest('.lr').remove()" title="Remover">✕</button></div>`;
+ let campos='';
+ if(tp==='transferencia')campos=`<label>📍 Recolher em (origem)</label><select id="g1" style="width:100%">${lo(r.local_id)}</select><label>📍 Levar para (destino)</label><select id="g2" style="width:100%">${lo(r.tr_destino_id)}</select><label>Material</label><input id="g3" value="${esc(r.material||'')}">`;
+ else if(tp==='entrega_cimi')campos=`<label>📍 Entregar em (local)</label><select id="g2" style="width:100%">${lo(r.tr_destino_id)}</select><label>Lista de materiais</label><div id="g4">${(lista.length?lista:[{}]).map(linha).join('')}</div><button class="btn s o" type="button" id="g5" style="margin:4px 0 8px">➕ Adicionar item</button>`;
+ else if(avulso)campos=`<label>📍 Local onde está o material</label><select id="g1" style="width:100%">${lo(r.local_id)}</select><label>Material</label><input id="g3" value="${esc(r.material||'')}">`;
+ else campos=`<div class="m" style="margin:6px 0">${esc(x.ferramenta||'')} ${esc(x.patrimonio||'')} · ${esc(x.local||'')} — só a observação pode ser alterada.</div>`;
+ exModal(`<h3>✏️ Editar pedido</h3>${campos}<label>Observação</label><textarea id="g6" rows="2">${esc(r.obs||'')}</textarea>
+ <label>🔒 Sua senha de acesso (obrigatória)</label><input type="text" name="usuario_cimi" autocomplete="username" value="${esc(me.email||'')}" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0"><input id="g7" type="password" autocomplete="new-password"><div class="err" id="g8"></div>
+ <div class="acts" style="margin-top:14px"><button class="btn" id="g9" style="flex:1;padding:12px">Salvar alterações</button><button class="btn o" id="ga">Cancelar</button></div>`,
+ (m,c)=>{m.querySelector('#ga').onclick=c;const ad=m.querySelector('#g5');if(ad)ad.onclick=()=>m.querySelector('#g4').insertAdjacentHTML('beforeend',linha());
+  m.querySelector('#g9').onclick=async e=>{const b=e.target,er=m.querySelector('#g8'),q=s=>m.querySelector(s),dados={obs:q('#g6').value.trim()};er.textContent='';
+   if(q('#g1'))dados.local=q('#g1').value;if(q('#g2'))dados.destino=q('#g2').value;if(q('#g3'))dados.material=q('#g3').value.trim();
+   if((q('#g1')&&!dados.local)||(q('#g2')&&!dados.destino))return er.textContent='Selecione os locais.';
+   if(q('#g3')&&dados.material.length<3)return er.textContent='Informe o material.';
+   if(q('#g4')){const it=[];let bad='';m.querySelectorAll('.lr').forEach(l=>{const cat=l.querySelector('.lc').value,ds=l.querySelector('.ld').value.trim(),qt=l.querySelector('.lq').value.trim();if(!cat&&!ds&&!qt)return;if(!cat)bad='Escolha a categoria de cada item.';else if(ds.length<2)bad='Descreva cada item da lista.';else it.push({cat,desc:ds,qtd:qt})});if(bad)return er.textContent=bad;if(!it.length)return er.textContent='Adicione ao menos um item.';dados.itens=it}
+   if(!q('#g7').value)return er.textContent='Digite sua senha para confirmar.';
+   b.disabled=true;er.textContent='Conferindo…';
+   try{if(!await checkPw(q('#g7').value)){b.disabled=false;return er.textContent='Senha incorreta.'}
+    const {data,error}=await sb.rpc('fluxo_editar_pedido',{p_id:id,p_dados:dados});if(error)throw error;
+    if(data==='ok'){c();await logEdit('recolhimentos',(x.ferramenta||'Pedido')+' · '+(x.local||''),[['pedido','editado',JSON.stringify(dados).slice(0,200)]]);await load();await carregaRC();toast('Pedido atualizado ✔')}
+    else{b.disabled=false;er.textContent=GMSG[data]||fxErr(data)}}
    catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}})}
 let EXL=null;
 async function exMaterial(){if(!EXL){try{const {data,error}=await sb.rpc('exec_locais');if(error)throw error;EXL=data||[]}catch(e){return toast('Não foi possível carregar os locais: '+(e.message||e)+'. Confirme que o SQL do material avulso foi executado.')}}
