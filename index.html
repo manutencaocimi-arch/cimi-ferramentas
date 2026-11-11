@@ -1092,8 +1092,26 @@ function kitConferir(pid){const p=kP(pid),it=kIt(pid);if(!p)return;if(!it.length
   catch(x){er.textContent='Erro: '+(x.message||x);b.disabled=false}}}
 
 const kTermosHtml=pid=>{const tm=kTm(pid);if(D.ktErr)return`<div class="m" style="margin-top:14px">📎 Termos: rode o arquivo <b>kits_termos.sql</b> no Supabase para ativar os anexos.</div>`;
- return`<h4 style="margin:18px 0 6px">📎 Termo de responsabilidade (${tm.length})</h4>${tm.map((t,i)=>`<div class="tl" style="border-left-color:${i?'var(--b)':'#7b4fc4'}"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><a class="btn s ${i?'o':''}" style="text-decoration:none" href="${esc(t.url)}" target="_blank" rel="noopener">${/pdf/i.test(t.tipo_arquivo||t.url)?'📄':'🖼️'} Abrir ${i?'versão anterior':'termo atual'}</a><span class="m">${esc(t.arquivo||'')}</span>${me.papel==='principal'?`<button class="btn s o" style="color:#c0392b;border-color:#c0392b" title="Remover anexo enviado por engano" onclick="kitTermoExcluir('${t.id}')">🗑</button>`:''}</div>
+ return`<h4 style="margin:18px 0 6px">📎 Termo de responsabilidade (${tm.length})</h4>${tm.map((t,i)=>`<div class="tl" style="border-left-color:${i?'var(--b)':'#7b4fc4'}"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="m" style="font-weight:700;color:var(--t)">${/pdf/i.test(t.tipo_arquivo||t.url)?'📄':'🖼️'} ${i?'Versão anterior':'Termo atual'}</span><button class="btn s ${i?'o':''}" onclick="kitTermoVer('${t.id}')">👁 Visualizar</button><button class="btn s o" onclick="kitTermoBaixar('${t.id}')">⬇ Baixar</button><span class="m">${esc(t.arquivo||'')}</span>${me.papel==='principal'?`<button class="btn s o" style="color:#c0392b;border-color:#c0392b" title="Remover anexo enviado por engano" onclick="kitTermoExcluir('${t.id}')">🗑</button>`:''}</div>
  <div class="m">Assinado em ${kDt(t.data_termo)} · anexado por ${esc(t.usuario_nome||'—')} em ${fmt(t.created_at)}${t.obs?' · '+esc(t.obs):''}</div></div>`).join('')||'<p class="m">Nenhum termo anexado ainda. Clique em “📎 Anexar termo assinado”.</p>'}`};
+const kTmBlob=async t=>{const r=await fetch(t.url);if(!r.ok)throw new Error('arquivo não encontrado ('+r.status+')');const b=await r.blob();return new Blob([b],{type:t.tipo_arquivo||b.type||'application/octet-stream'})};
+const kTmNome=t=>t.arquivo||('termo'+(/pdf/i.test(t.tipo_arquivo||'')?'.pdf':'.jpg'));
+async function kitTermoBaixar(id){const t=(D.kt||[]).find(x=>String(x.id)===String(id));if(!t)return;
+ try{const b=await kTmBlob(t),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=kTmNome(t);document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),6e4)}
+ catch(e){window.open(t.url+(t.url.includes('?')?'&':'?')+'download='+encodeURIComponent(kTmNome(t)),'_blank')}}
+async function kitTermoVer(id){const t=(D.kt||[]).find(x=>String(x.id)===String(id));if(!t)return;const p=kP(t.pessoa_id),pdf=/pdf/i.test(t.tipo_arquivo||t.url);
+ const m=document.createElement('div');m.className='mask';m.style.zIndex=12;let u=null;const fechar=()=>{m.remove();if(u)URL.revokeObjectURL(u)};m.addEventListener('click',e=>{if(e.target===m)fechar()});
+ m.innerHTML=`<div class="modal" style="max-width:1000px;height:92vh;display:flex;flex-direction:column"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><h3 style="margin:0;flex:1">📎 Termo de responsabilidade — ${esc(p?.nome||'')}</h3>
+ <button class="btn s o" id="tv1">↗ Abrir em nova aba</button><button class="btn s o" id="tv2">⬇ Baixar</button><button class="btn s" id="tv3">Fechar</button></div>
+ <div class="m" style="margin-bottom:8px">${esc(kTmNome(t))} · assinado em ${kDt(t.data_termo)} · anexado por ${esc(t.usuario_nome||'—')}</div>
+ <div id="tv4" style="flex:1;min-height:0;border:1px solid var(--b);border-radius:8px;overflow:auto;background:#f6f8f7;display:flex;align-items:center;justify-content:center"><span class="m">Carregando…</span></div></div>`;
+ document.body.appendChild(m);m.querySelector('#tv3').onclick=fechar;m.querySelector('#tv2').onclick=()=>kitTermoBaixar(id);
+ m.querySelector('#tv1').onclick=()=>window.open(u||t.url,'_blank');
+ const box=m.querySelector('#tv4');
+ try{u=URL.createObjectURL(await kTmBlob(t))}catch(e){u=null}
+ const src=u||t.url;
+ box.innerHTML=pdf?`<iframe src="${esc(src)}" title="Termo" style="width:100%;height:100%;border:0;background:#fff"></iframe>`:`<img src="${esc(src)}" alt="Termo" style="max-width:100%;max-height:100%;object-fit:contain;cursor:zoom-in">`;
+ const im=box.querySelector('img');if(im)im.onclick=()=>{const z=im.style.maxWidth==='none';im.style.maxWidth=im.style.maxHeight=z?'100%':'none';im.style.cursor=z?'zoom-in':'zoom-out';box.style.alignItems=box.style.justifyContent=z?'center':'flex-start'}}
 function kitTermoAnexar(pid){const p=kP(pid);if(!p)return;if(D.ktErr)return toast('Rode o arquivo kits_termos.sql no Supabase para ativar os anexos.');
  const m=document.createElement('div');m.className='mask';
  m.innerHTML=`<div class="modal"><h3>📎 Anexar termo de responsabilidade</h3><div class="m">${esc(p.nome)} · ${esc(kFn(p))}</div>
