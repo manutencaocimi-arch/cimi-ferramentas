@@ -65,7 +65,7 @@ const SUPABASE_URL='https://qviqhcntabtuyisdhdqo.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2aXFoY250YWJ0dXlpc2RoZHFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMTA3NDUsImV4cCI6MjEwODc4Njc0NX0.d86r1LH9dKXg6q9geSD-xJ2IEDPSZAlzsSR8F2EJ7bk';
 // ==================================================================
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-let me=null,D={f:[],l:[],m:[],mT:[],e:[],p:[],fn:[],rc:[],ki:[],kc:[]},tab='painel',q='',flt='todos';
+let me=null,D={f:[],l:[],m:[],mT:[],e:[],p:[],fn:[],rc:[],ki:[],kc:[],kt:[]},tab='painel',q='',flt='todos';
 const $=s=>document.querySelector(s);
 let saindo=false;
 async function sair(){saindo=true;
@@ -661,7 +661,7 @@ function fluxoEntregar(id){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
  <label>Observação (opcional)</label><textarea id="e4" rows="2"></textarea><div class="err" id="e5"></div>
  <div class="acts" style="margin-top:14px"><button class="btn" id="e6" style="flex:1;padding:12px">✔ Confirmar entrega</button><button class="btn o" id="e7">Cancelar</button></div>`,
  (m,c,pv)=>{pv('#e2','#e3');m.querySelector('#e7').onclick=c;
-  (async()=>{const sel=m.querySelector('#e8');try{const {data,error}=await sb.rpc('logistica_pessoas');if(error)throw error;let g=null,h='';(data||[]).forEach(p=>{if(p.funcao!==g){if(g!==null)h+='</optgroup>';g=p.funcao;h+=`<optgroup label="${esc(g||'Sem função')}">`}h+=`<option value="${esc(p.id)}">${esc(p.nome)}</option>`});if(g!==null)h+='</optgroup>';sel.insertAdjacentHTML('beforeend',h)}
+  (async()=>{const sel=m.querySelector('#e8');try{const {data,error}=await sb.rpc('logistica_pessoas_resp');if(error)throw error;let g=null,h='';(data||[]).forEach(p=>{if(p.funcao!==g){if(g!==null)h+='</optgroup>';g=p.funcao;h+=`<optgroup label="${esc(g||'Sem função')}">`}h+=`<option value="${esc(p.id)}">${esc(p.nome)}</option>`});if(g!==null)h+='</optgroup>';sel.insertAdjacentHTML('beforeend',h)}
    catch(_){sel.disabled=true;m.querySelector('#e9').textContent='(Lista de pessoas indisponível: rode o arquivo logistica_responsavel.sql no Supabase.)'}})();
   m.querySelector('#e6').onclick=async e=>{const b=e.target,er=m.querySelector('#e5'),on=m.querySelector('#e1').value.trim(),ob=m.querySelector('#e4').value.trim(),fl=m.querySelector('#e2').files[0];er.textContent='';
    if(on.length<3)return er.textContent='Informe onde o material foi deixado.';if(!fl)return er.textContent='Tire a foto do material deixado no local.';
@@ -760,10 +760,10 @@ async function start(){
  await load(); render();carregaRC();
  sb.channel('rt').on('postgres_changes',{event:'*',schema:'public'},async()=>{await load();render();carregaRC()}).subscribe()}
 async function load(){
- const [f,l,m,e,pe,fu,rc,cg,ki,kc]=await Promise.all([sb.from('ferramentas').select('*').order('nome'),sb.from('locais').select('*').order('nome'),
-  sb.from('movimentacoes').select('*').order('created_at',{ascending:false}).limit(500),sb.from('edicoes').select('*').order('created_at',{ascending:false}).limit(300),sb.from('pessoas').select('*').order('nome'),sb.from('funcoes').select('*').order('nome'),sb.from('recolhimentos').select('*').order('created_at',{ascending:false}).limit(500),sb.from('cargos').select('*'),sb.from('kit_itens').select('*').order('created_at'),sb.from('kit_conferencias').select('*').order('created_at',{ascending:false}).limit(2000)]);
+ const [f,l,m,e,pe,fu,rc,cg,ki,kc,kt]=await Promise.all([sb.from('ferramentas').select('*').order('nome'),sb.from('locais').select('*').order('nome'),
+  sb.from('movimentacoes').select('*').order('created_at',{ascending:false}).limit(500),sb.from('edicoes').select('*').order('created_at',{ascending:false}).limit(300),sb.from('pessoas').select('*').order('nome'),sb.from('funcoes').select('*').order('nome'),sb.from('recolhimentos').select('*').order('created_at',{ascending:false}).limit(500),sb.from('cargos').select('*'),sb.from('kit_itens').select('*').order('created_at'),sb.from('kit_conferencias').select('*').order('created_at',{ascending:false}).limit(2000),sb.from('kit_termos').select('*').order('created_at',{ascending:false})]);
  const mAll=m.data||[],ehTr=x=>x.tipo==='retirada'&&(x.recolhimento_id||/^(Transferência urgente|Trâmite da 1ª)/.test(x.obs||''));
- D={f:f.data||[],l:l.data||[],m:mAll.filter(x=>!ehTr(x)),mT:mAll.filter(ehTr),e:e.data||[],p:pe.data||[],fn:fu.data||[],rc:rc.data||[],ki:ki.data||[],kc:kc.data||[],kErr:ki.error?(ki.error.message||'erro'):''};CG=Object.fromEntries((cg.data||[]).map(r=>[r.user_id,r]))}
+ D={f:f.data||[],l:l.data||[],m:mAll.filter(x=>!ehTr(x)),mT:mAll.filter(ehTr),e:e.data||[],p:pe.data||[],fn:fu.data||[],rc:rc.data||[],ki:ki.data||[],kc:kc.data||[],kt:kt.data||[],ktErr:kt.error?(kt.error.message||'erro'):'',kErr:ki.error?(ki.error.message||'erro'):''};CG=Object.fromEntries((cg.data||[]).map(r=>[r.user_id,r]))}
 
 // ---------- Modal / formulário genérico ----------
 function form(title,fields,okLabel,onSubmit){
@@ -919,10 +919,11 @@ const kIt=pid=>(D.ki||[]).filter(x=>String(x.pessoa_id)===String(pid)&&x.status=
 const kEnc=pid=>(D.ki||[]).filter(x=>String(x.pessoa_id)===String(pid)&&x.status!=='com_pessoa').sort((a,b)=>new Date(b.encerrado_em||b.created_at)-new Date(a.encerrado_em||a.created_at));
 const kCf=pid=>(D.kc||[]).filter(x=>String(x.pessoa_id)===String(pid));
 const kUlt=pid=>kCf(pid)[0]||null;
+const kTm=pid=>(D.kt||[]).filter(x=>String(x.pessoa_id)===String(pid));
 const kUn=a=>a.reduce((s,x)=>s+(+x.quantidade||1),0);
 const kVenc=pid=>{if(!kIt(pid).length)return false;const u=kUlt(pid);return !u||Date.now()-new Date(u.created_at)>KDIAS*864e5};
 const kDiv=pid=>!!kIt(pid).length&&kUlt(pid)?.resultado==='divergencia';
-const kDt=d=>d?new Date(d).toLocaleDateString('pt-BR'):'—';
+const kDt=d=>!d?'—':/^\d{4}-\d{2}-\d{2}$/.test(d)?d.split('-').reverse().join('/'):new Date(d).toLocaleDateString('pt-BR');
 const kHa=d=>{const n=Math.floor((Date.now()-new Date(d))/864e5);return n<=0?'hoje':n===1?'há 1 dia':'há '+n+' dias'};
 const kHoje=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
 const kNome=x=>(+x.quantidade||1)+'× '+x.descricao;
@@ -936,7 +937,7 @@ const kPesOpts=()=>[['','— Selecionar pessoa —'],...D.p.filter(p=>p.ativo).s
 const kParse=t=>String(t||'').split(/\r?\n/).map(l=>l.trim().replace(/^[-•*]\s*/,'')).filter(Boolean).map(l=>{let [d,pat]=l.split('|').map(s=>s.trim());let qt=1;
  const m=d.match(/^(\d{1,3})\s*(?:x|×|un\.?|unid\.?|-)?\s+(.+)$/i);if(m){qt=+m[1]||1;d=m[2].trim()}
  return{quantidade:Math.max(1,qt),descricao:d.charAt(0).toUpperCase()+d.slice(1),patrimonio:pat||null}}).filter(x=>x.descricao);
-const kOk=(p,k)=>k==='todos'||(k==='com'&&kIt(p.id).length>0)||(k==='sem'&&!kIt(p.id).length)||(k==='venc'&&kVenc(p.id))||(k==='div'&&kDiv(p.id));
+const kOk=(p,k)=>k==='todos'||(k==='com'&&kIt(p.id).length>0)||(k==='sem'&&!kIt(p.id).length)||(k==='venc'&&kVenc(p.id))||(k==='div'&&kDiv(p.id))||(k==='semtermo'&&kIt(p.id).length>0&&!kTm(p.id).length);
 const kBase=()=>D.p.filter(p=>(p.ativo||kIt(p.id).length)&&(kSel==='todas'||String(p.funcao_id)===String(kSel)));
 const kLista=()=>{const t=q.toLowerCase();return kBase().filter(p=>kOk(p,kFlt)&&`${p.nome} ${kFn(p)} ${kIt(p.id).map(x=>x.descricao+' '+(x.patrimonio||'')+' '+(x.tipo||'')).join(' ')}`.toLowerCase().includes(t)).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'))};
 
@@ -947,14 +948,14 @@ function kits(){
  const chip=(id,nome,cor,ic)=>{const ps=id==='todas'?ativos:ativos.filter(p=>p.funcao_id===id),k=ps.filter(p=>kIt(p.id).length).length;
   return`<button class="gc ${String(kSel)===String(id)?'on':''}" style="--c:${cor}" onclick="kSel='${id}';render()"><span class="ic">${ic}</span><b>${esc(nome)}</b><span class="n">${k}</span> <span style="font-size:13px">com kit de ${ps.length}</span><div class="bar2"><i style="width:${ps.length?Math.round(k/ps.length*100):0}%"></i></div></button>`};
  const base=kBase(),cnt=k=>base.filter(p=>kOk(p,k)).length,un=kUn(base.flatMap(p=>kIt(p.id))),r=kLista();
- const sc=[['todos','Pessoas','var(--t)'],['com','Com kit','var(--g)'],['sem','Sem kit','#888'],['venc',`Conferência pendente (+${KDIAS} dias ou nunca)`,'var(--o)'],['div','Com divergência','var(--r)']];
+ const sc=[['todos','Pessoas','var(--t)'],['com','Com kit','var(--g)'],['sem','Sem kit','#888'],['venc',`Conferência pendente (+${KDIAS} dias ou nunca)`,'var(--o)'],['div','Com divergência','var(--r)'],['semtermo','Com kit e sem termo anexado','#7b4fc4']];
  const cards=sc.map(t=>`<div class="card stc ${kFlt===t[0]?'on':''}" style="--sc:${t[2]};cursor:pointer" role="button" tabindex="0" title="Clique para listar: ${esc(t[1])}" onclick="kFlt=(kFlt==='${t[0]}'?'todos':'${t[0]}');render()" onkeydown="if(event.key==='Enter'||event.key===' '){this.click();event.preventDefault()}"><b style="color:${t[2]}">${cnt(t[0])}</b><span>${esc(t[1])}</span>${kFlt===t[0]&&t[0]!=='todos'?'<small class="m"> · filtro ativo (clique para limpar)</small>':''}</div>`).join('')+`<div class="card"><b style="color:var(--bl)">${un}</b><span>Unidades em posse das pessoas</span></div>`;
  const tile=(p,i)=>{const c=fcor(p.funcao_id),it=kIt(p.id),pv=it.slice(0,4).map(kNome).join(' · ')+(it.length>4?` · +${it.length-4}`:'');
   return`<div class="tile" style="--c:${c};animation-delay:${Math.min(i,12)*30}ms;${p.ativo?'':'opacity:.55'}">
   <div style="display:flex;gap:10px;align-items:center"><div style="width:40px;height:40px;border-radius:50%;background:${c};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;flex:none">${esc(p.nome.trim()[0]||'?')}</div><b>${esc(p.nome)}</b></div>
   <div><span class="pill" style="background:${c};color:#fff">${esc(kFn(p))}</span> ${p.ativo?'':'<span class="pill">Inativo</span> '}${it.length?`<span class="pill u">🎒 ${it.length} ${it.length===1?'item':'itens'} · ${kUn(it)} un.</span>`:'<span class="pill">Sem kit</span>'}</div>
-  ${it.length?`<div>${kConfTag(p.id)}</div><div class="m">${esc(pv)}</div>`:''}
-  <div class="acts">${it.length?`<button class="btn s" onclick="kitVer('${p.id}')">👁 Ver kit</button>`:''}<button class="btn s o" onclick="kitAdd('${p.id}')">+ Itens</button>${it.length?`<button class="btn s y" onclick="kitConferir('${p.id}')">✔ Conferir</button><button class="btn s o" title="Imprimir termo de responsabilidade para assinatura" onclick="kitTermo('${p.id}')">🖨 Termo</button>`:''}</div></div>`};
+  ${it.length?`<div>${kConfTag(p.id)} ${kTm(p.id).length?`<span class="pill z">📎 Termo anexado (${kDt(kTm(p.id)[0].data_termo||kTm(p.id)[0].created_at)})</span>`:'<span class="pill" style="background:#f1ebfb;color:#5b3a99;font-weight:700">📎 Sem termo anexado</span>'}</div><div class="m">${esc(pv)}</div>`:''}
+  <div class="acts">${it.length?`<button class="btn s" onclick="kitVer('${p.id}')">👁 Ver kit</button>`:''}<button class="btn s o" onclick="kitAdd('${p.id}')">+ Itens</button>${it.length?`<button class="btn s y" onclick="kitConferir('${p.id}')">✔ Conferir</button><button class="btn s o" title="Anexar o termo de responsabilidade assinado (PDF ou foto)" onclick="kitTermoAnexar('${p.id}')">📎 Termo</button>`:''}</div></div>`};
  return`<div class="gg">${chip('todas','Todas as funções','#1d2a22','🎒')}${fns.map(f=>chip(f.id,f.nome,fcor(f.id),kIc(f.nome))).join('')}</div>
  <div class="cards">${cards}</div>
  <div class="m" style="margin:-4px 0 10px">Mostrando <b style="display:inline;font-size:inherit">${r.length}</b> pessoa(s). Na busca você também pode digitar o nome de uma ferramenta para saber com quem ela está.</div>
@@ -971,10 +972,11 @@ function kitVer(pid){const p=kP(pid);if(!p)return;const it=kIt(pid),en=kEnc(pid)
  <div style="display:flex;gap:12px;align-items:center"><div style="width:46px;height:46px;border-radius:50%;background:${c};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex:none">${esc(p.nome.trim()[0]||'?')}</div>
  <div><h3 style="margin:0">🎒 Kit de ${esc(p.nome)}</h3><div class="m">${kIc(fn)} ${esc(fn)} · ${it.length} ${it.length===1?'item':'itens'} · ${kUn(it)} unidade(s)</div></div></div>
  <div style="margin:10px 0">${kConfTag(pid)}</div>
- <div class="acts" style="margin-bottom:10px"><button class="btn" onclick="kitAdd('${p.id}')">+ Adicionar itens</button>${it.length?`<button class="btn y" onclick="kitConferir('${p.id}')">✔ Fazer conferência</button><button class="btn o" onclick="kitTermo('${p.id}')">🖨 Termo de responsabilidade</button>`:''}</div>
+ <div class="acts" style="margin-bottom:10px"><button class="btn" onclick="kitAdd('${p.id}')">+ Adicionar itens</button>${it.length?`<button class="btn y" onclick="kitConferir('${p.id}')">✔ Fazer conferência</button>`:''}<button class="btn o" onclick="kitTermoAnexar('${p.id}')">📎 Anexar termo assinado</button></div>
  <div class="tw"><table><tr><th>Qtd</th><th>Item</th><th>Tipo</th><th>Patrimônio</th><th>Estado</th><th>Com a pessoa desde</th><th>Última conferência</th><th>Ações</th></tr>
  ${it.map(x=>`<tr><td><b>${x.quantidade}</b></td><td><b>${esc(x.descricao)}</b>${x.recolhimento_id?' <span class="pill" title="Deixado com a pessoa pela Logística">🚚 via Logística</span>':''}${x.obs?`<div class="m">${esc(x.obs)}</div>`:''}</td><td style="white-space:nowrap">${esc(kTipoTxt(x.tipo))}</td><td>${esc(kPatTxt(x))}</td><td>${x.estado==='ruim'?'<b style="color:var(--r)">'+esc(KEST[x.estado])+'</b>':esc(KEST[x.estado]||x.estado||'—')}</td><td>${kDt(x.entregue_em)}<div class="m">${esc(x.entregue_por||'')}</div></td><td>${sit(x)}</td>
  <td><div class="acts" style="flex-wrap:nowrap"><button class="btn s o" title="Editar item" onclick="kitEdit('${x.id}')">✏️</button><button class="btn s o" title="Devolver ao CIMI, dar baixa ou passar para outra pessoa" onclick="kitDevolver('${x.id}')">↩ Tirar do kit</button>${me.papel==='principal'?`<button class="btn s o" style="color:#c0392b;border-color:#c0392b" title="Excluir lançamento errado" onclick="kitExcluir('${x.id}')">🗑</button>`:''}</div></td></tr>`).join('')||'<tr><td colspan=8 class="m">Nenhum item no kit desta pessoa. Clique em “+ Adicionar itens”.</td></tr>'}</table></div>
+ ${kTermosHtml(pid)}
  ${cf.length?`<h4 style="margin:18px 0 6px">✔ Conferências (${cf.length})</h4>${cf.slice(0,10).map(k=>{const pr=(k.itens||[]).filter(y=>y.sit!=='ok');
   return`<div class="tl" style="border-left-color:${k.resultado==='ok'?'var(--g)':'var(--r)'}"><b>${k.resultado==='ok'?'✔ Tudo conferido':'⚠ Divergência'}</b> <span class="m">· ${fmt(k.created_at)} · por ${esc(k.usuario_nome||'—')} · ${(k.itens||[]).length} item(ns) conferido(s)</span>
   ${pr.map(y=>`<div class="m">${y.sit==='falta'?'✖ Faltando':'⚠ Danificado'}: <b>${esc(y.nome)}</b>${y.obs?' — '+esc(y.obs):''}</div>`).join('')}${k.obs?`<div>💬 ${esc(k.obs)}</div>`:''}${k.foto_url?`<img class="ph" style="margin-top:6px" src="${esc(k.foto_url)}" onclick="foto('${esc(k.foto_url)}')">`:''}</div>`}).join('')}`:''}
@@ -1089,25 +1091,40 @@ function kitConferir(pid){const p=kP(pid),it=kIt(pid);if(!p)return;if(!it.length
    m.remove();kReabre=p.id;toast(res==='ok'?'Conferência salva: tudo OK ✔':'Conferência salva com divergência ⚠');await load();render()}
   catch(x){er.textContent='Erro: '+(x.message||x);b.disabled=false}}}
 
-function kitTermo(pid){const p=kP(pid),it=kIt(pid);if(!p)return;const fn=kFn(p),w=window.open('','_blank');if(!w)return toast('Libere as janelas pop-up deste site para imprimir.');
- const e=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
- w.document.open();w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Termo de responsabilidade - ${e(p.nome)}</title><style>body{font:13px Arial,sans-serif;margin:24px;color:#111}h1{font-size:18px;margin:0 0 4px}.s{color:#555;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0}th,td{border:1px solid #999;padding:6px;text-align:left}th{background:#2e9e4f;color:#fff}p{line-height:1.5}.as{display:flex;gap:40px;margin-top:60px}.as div{flex:1;border-top:1px solid #111;padding-top:6px;text-align:center}@page{size:A4;margin:14mm}</style></head><body>
- <h1>CIMI · Termo de responsabilidade — kit de ferramentas</h1><div class="s">Gerado em ${e(fmt(new Date()))} por ${e(me.nome)}</div>
- <p><b>Colaborador:</b> ${e(p.nome)}<br><b>Função:</b> ${e(fn)}</p>
- <table><thead><tr><th>Qtd</th><th>Item</th><th>Tipo</th><th>Patrimônio</th><th>Estado</th><th>Recebido em</th></tr></thead><tbody>${it.map(x=>`<tr><td>${e(x.quantidade)}</td><td>${e(x.descricao)}</td><td>${e(x.tipo||'—')}</td><td>${e(kPatTxt(x))}</td><td>${e(KEST[x.estado]||'')}</td><td>${e(kDt(x.entregue_em))}</td></tr>`).join('')}</tbody></table>
- <p>Total: <b>${it.length}</b> ${it.length===1?'item':'itens'} (${kUn(it)} unidades).</p>
- <p>Declaro que recebi as ferramentas relacionadas acima para uso nas minhas atividades de ${e(fn.toLowerCase())} e me comprometo a: zelar pela guarda e conservação delas; usá-las somente no serviço; comunicar imediatamente à coordenação qualquer perda, furto ou dano; apresentá-las sempre que houver conferência; e devolvê-las ao CIMI quando solicitado ou em caso de mudança de função ou desligamento.</p>
- <p>Local e data: ______________________________, ____/____/________</p>
- <div class="as"><div>${e(p.nome)}<br><small>Colaborador</small></div><div>Responsável CIMI / Coordenação</div></div></body></html>`);
- w.document.close();w.focus();setTimeout(()=>w.print(),400)}
+const kTermosHtml=pid=>{const tm=kTm(pid);if(D.ktErr)return`<div class="m" style="margin-top:14px">📎 Termos: rode o arquivo <b>kits_termos.sql</b> no Supabase para ativar os anexos.</div>`;
+ return`<h4 style="margin:18px 0 6px">📎 Termo de responsabilidade (${tm.length})</h4>${tm.map((t,i)=>`<div class="tl" style="border-left-color:${i?'var(--b)':'#7b4fc4'}"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><a class="btn s ${i?'o':''}" style="text-decoration:none" href="${esc(t.url)}" target="_blank" rel="noopener">${/pdf/i.test(t.tipo_arquivo||t.url)?'📄':'🖼️'} Abrir ${i?'versão anterior':'termo atual'}</a><span class="m">${esc(t.arquivo||'')}</span>${me.papel==='principal'?`<button class="btn s o" style="color:#c0392b;border-color:#c0392b" title="Remover anexo enviado por engano" onclick="kitTermoExcluir('${t.id}')">🗑</button>`:''}</div>
+ <div class="m">Assinado em ${kDt(t.data_termo)} · anexado por ${esc(t.usuario_nome||'—')} em ${fmt(t.created_at)}${t.obs?' · '+esc(t.obs):''}</div></div>`).join('')||'<p class="m">Nenhum termo anexado ainda. Clique em “📎 Anexar termo assinado”.</p>'}`};
+function kitTermoAnexar(pid){const p=kP(pid);if(!p)return;if(D.ktErr)return toast('Rode o arquivo kits_termos.sql no Supabase para ativar os anexos.');
+ const m=document.createElement('div');m.className='mask';
+ m.innerHTML=`<div class="modal"><h3>📎 Anexar termo de responsabilidade</h3><div class="m">${esc(p.nome)} · ${esc(kFn(p))}</div>
+ <label>Arquivo do termo assinado (PDF ou foto — obrigatório)</label><input type="file" id="ta1" accept="application/pdf,image/*"><div id="ta2" class="m" style="margin:6px 0"></div>
+ <label>Data da assinatura</label><input type="date" id="ta3" value="${kHoje()}">
+ <label>Observação (opcional)</label><input id="ta4" placeholder="Ex.: termo atualizado após inclusão da roçadeira">
+ <div class="err" id="ta5"></div><div class="acts" style="margin-top:14px"><button class="btn" id="ta6">📎 Anexar</button><button class="btn o" id="ta7">Cancelar</button></div></div>`;
+ document.body.appendChild(m);m.querySelector('#ta7').onclick=()=>m.remove();
+ m.querySelector('#ta1').onchange=e=>{const f=e.target.files[0];m.querySelector('#ta2').innerHTML=!f?'':/^image\//.test(f.type)?`<img src="${URL.createObjectURL(f)}" style="max-width:100%;max-height:220px;border-radius:8px">`:`📄 ${esc(f.name)} (${(f.size/1048576).toFixed(1)} MB)`};
+ m.querySelector('#ta6').onclick=async e=>{const b=e.target,er=m.querySelector('#ta5'),f=m.querySelector('#ta1').files[0];er.textContent='';
+  if(!f)return er.textContent='Escolha o arquivo do termo assinado.';if(!/pdf|image\//i.test(f.type))return er.textContent='Envie um PDF ou uma foto.';if(f.size>15*1048576)return er.textContent='Arquivo muito grande (máx. 15 MB).';
+  b.disabled=true;er.textContent='Enviando…';
+  try{const ext=(f.name.match(/\.[a-z0-9]+$/i)||[/pdf/i.test(f.type)?'.pdf':'.jpg'])[0].toLowerCase(),pa=`kits/termos/${pid}/${Date.now()}${ext}`;
+   const {error:ue}=await sb.storage.from('fotos').upload(pa,f,{contentType:f.type});if(ue)throw new Error(ue.message+(/mime|type/i.test(ue.message)?' (o armazenamento "fotos" não aceita este tipo de arquivo; tente enviar uma foto do termo)':''));
+   const url=sb.storage.from('fotos').getPublicUrl(pa).data.publicUrl,dv=m.querySelector('#ta3').value;
+   const {error}=await sb.from('kit_termos').insert({pessoa_id:p.id,url,arquivo:f.name,tipo_arquivo:f.type,data_termo:dv||null,obs:m.querySelector('#ta4').value.trim()||null,usuario_id:me.id,usuario_nome:me.nome});if(error)throw error;
+   await logEdit('kits',p.nome+' — termo de responsabilidade',[['termo anexado','',f.name]]);
+   m.remove();kReabre=p.id;toast('Termo anexado ✔');await load();render()}
+  catch(x){b.disabled=false;er.textContent='Erro: '+(x.message||x)}}}
+function kitTermoExcluir(id){const t=(D.kt||[]).find(x=>String(x.id)===String(id));if(!t)return;const p=kP(t.pessoa_id);
+ form('🗑 Remover termo anexado',[{k:'aviso',l:'Use só para remover um arquivo enviado por engano.',t:'hidden',value:''},pwField],'Remover',async v=>{
+  if(!await checkPw(v.senha))return'Senha incorreta.';const {data,error}=await sb.from('kit_termos').delete().eq('id',t.id).select();if(error)throw error;if(!data?.length)return'Apenas o usuário principal pode remover.';
+  await logEdit('kits',(p?.nome||'')+' — termo de responsabilidade',[['termo removido',t.arquivo||t.url,'—']]);kReabre=t.pessoa_id;toast('Termo removido ✔')})}
 
 function kitRel(tipo){const ps=kLista();if(!ps.length)return toast('Nenhuma pessoa no filtro atual.');const w=tipo==='print'?window.open('','_blank'):null;if(tipo==='print'&&!w)return toast('Libere as janelas pop-up deste site para imprimir.');
- const head=['Pessoa','Qtd','Item','Tipo','Patrimônio','Estado','Com a pessoa desde','Última conferência'];
- const linhas=p=>{const u=kUlt(p.id),uc=u?kDt(u.created_at)+(u.resultado==='ok'?' (OK)':' (divergência)'):'Nunca conferido',it=kIt(p.id);
-  return it.length?it.map(x=>[p.nome,x.quantidade,x.descricao,x.tipo||'',kPatTxt(x),KEST[x.estado]||'',kDt(x.entregue_em),uc]):[[p.nome,'','(sem kit)','','','','','']]};
+ const head=['Pessoa','Qtd','Item','Tipo','Patrimônio','Estado','Com a pessoa desde','Última conferência','Termo assinado'];
+ const linhas=p=>{const tm=kTm(p.id)[0],tt=tm?'Sim · '+kDt(tm.data_termo||tm.created_at):'Não',u=kUlt(p.id),uc=u?kDt(u.created_at)+(u.resultado==='ok'?' (OK)':' (divergência)'):'Nunca conferido',it=kIt(p.id);
+  return it.length?it.map(x=>[p.nome,x.quantidade,x.descricao,x.tipo||'',kPatTxt(x),KEST[x.estado]||'',kDt(x.entregue_em),uc,tt]):[[p.nome,'','(sem kit)','','','','','','']]};
  const fns=[...new Set(ps.map(kFn))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
  const blocos=fns.map(f=>({t:f,head,rows:ps.filter(p=>kFn(p)===f).flatMap(linhas)}));
- const fl={todos:'',com:' · somente com kit',sem:' · somente sem kit',venc:' · conferência pendente',div:' · com divergência'}[kFlt]||'';
+ const fl={todos:'',com:' · somente com kit',sem:' · somente sem kit',venc:' · conferência pendente',div:' · com divergência',semtermo:' · com kit e sem termo anexado'}[kFlt]||'';
  try{baixar(tipo,'kits_pessoais_'+kHoje(),'CIMI · Kits pessoais de ferramentas',`${ps.length} pessoa(s) · ${kUn(ps.flatMap(p=>kIt(p.id)))} unidade(s) em posse${fl}`,blocos,w)}catch(x){if(w)w.close();toast('Erro: '+(x.message||x))}}
 
 // ---------- Telas ----------
