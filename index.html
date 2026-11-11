@@ -258,7 +258,7 @@ function recolHtml(){
   ${pe?(atr?`<div style="margin:6px 0;padding:8px 10px;border-radius:8px;background:#fdecea;color:#b42318;font-weight:800">🚨 EM ATRASO — aguardando retirada há ${haTempo(x.quando)} <span style="font-weight:600">(aberto em ${fmt(x.quando)} · prazo de 24 h excedido)</span></div>`:`<div style="margin:6px 0;padding:6px 10px;border-radius:8px;background:#fff4e5;color:#9a5b00;font-weight:700">⏱ Aguardando retirada há ${haTempo(x.quando)} <span style="font-weight:600">· prazo de execução: 24 h (restam ${haTempo(new Date(2*Date.now()-(new Date(x.quando).getTime()+864e5)))})</span></div>`):''}
   ${x.obs?`<div style="margin-top:6px">💬 ${esc(x.obs)}</div>`:''}
   ${bt(x.foto_pedido,'📷 Foto enviada por quem pediu (onde está / o que recolher)')}
-  ${!pe?`<div class="m" style="margin-top:8px">🚚 ${ea||ad?'Retirado':'Recolhido'} por ${esc(x.recolhido_por||'—')} · ${x.recolhido_em?fmt(x.recolhido_em):''}</div>${bt(x.foto,ea||ad?'📷 Foto da retirada no local':'📷 Foto do recolhimento')}`:''}
+  ${!pe?`<div class="m" style="margin-top:8px">🚚 ${ea||ad?'Retirado':'Recolhido'} por ${esc(x.recolhido_por||'—')} · ${x.recolhido_em?fmt(x.recolhido_em):''}</div>${bt(x.foto,ea||ad?'📷 Foto da retirada no local':'📷 Foto do recolhimento')}${tra&&pode?btTroca(x):''}`:''}
   ${x.status==='concluido'&&!ad?`<div class="m" style="margin-top:8px">📥 Recebido no CIMI por ${esc(x.recebido_por||'—')} · ${x.recebido_em?fmt(x.recebido_em):''}</div>${x.recebido_obs?`<div>💬 ${esc(x.recebido_obs)}</div>`:''}${bt(x.recebido_foto,'📷 Foto do recebimento no CIMI')}`:''}
   ${pe&&pode&&!sd?`<button class="btn" style="width:100%;margin-top:12px;padding:14px;font-size:16px" onclick="recolher('${x.id}')">${ea?'📷 ① Retirei no local — enviar foto':'📷 Recolhi — enviar foto'}</button>`:''}
   ${pe?gerirBtns(x.id):''}
@@ -280,7 +280,7 @@ function recolHtml(){
   ${pe?(atr?`<div style="margin:6px 0;padding:8px 10px;border-radius:8px;background:#fdecea;color:#b42318;font-weight:800">🚨 EM ATRASO — aguardando retirada há ${haTempo(x.quando)} <span style="font-weight:600">(aberto em ${fmt(x.quando)} · prazo de 24 h excedido)</span></div>`:`<div style="margin:6px 0;padding:6px 10px;border-radius:8px;background:#fff4e5;color:#9a5b00;font-weight:700">⏱ Aguardando retirada há ${haTempo(x.quando)} <span style="font-weight:600">· prazo de execução: 24 h (restam ${haTempo(new Date(2*Date.now()-(new Date(x.quando).getTime()+864e5)))})</span></div>`):''}
   ${x.obs?`<div style="margin-top:6px">💬 ${esc(x.obs)}</div>`:''}
   ${bt(x.foto_pedido,'📷 Foto enviada por quem pediu (material no local de origem)')}
-  ${!pe?`<div class="m" style="margin-top:8px">🚚 ${tf?'Recolhido':'Retirado na CIMI'} por ${esc(x.recolhido_por||'—')} · ${x.recolhido_em?fmt(x.recolhido_em):''}</div>${bt(x.foto,tf?'📷 Foto do recolhimento':'📷 Foto da retirada na CIMI')}`:''}
+  ${!pe?`<div class="m" style="margin-top:8px">🚚 ${tf?'Recolhido':'Retirado na CIMI'} por ${esc(x.recolhido_por||'—')} · ${x.recolhido_em?fmt(x.recolhido_em):''}</div>${bt(x.foto,tf?'📷 Foto do recolhimento':'📷 Foto da retirada na CIMI')}${tra&&pode?btTroca(x):''}`:''}
   ${fim?`<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#e9f7ee"><div>✔ Entregue por <strong>${esc(x.ent_por||'—')}</strong> · ${x.ent_em?fmt(x.ent_em):''}</div><div>📌 <strong>Deixado em:</strong> ${esc(x.ent_onde||'—')}</div>${x.ent_obs?`<div>💬 ${esc(x.ent_obs)}</div>`:''}</div>${bt(x.ent_foto,'📷 Foto do material deixado no local')}`:''}
   ${pe&&pode?`<button class="btn" style="width:100%;margin-top:12px;padding:14px;font-size:16px" onclick="fluxoRetirar('${x.id}')">${tf?'📷 ① Recolhi — enviar foto':'📦 ① Retirei na CIMI'}</button>`:''}
   ${pe?gerirBtns(x.id):''}
@@ -637,6 +637,20 @@ function fluxoRetirar(id){const x=(RC||[]).find(r=>r.id===id);if(!x)return;const
    try{const url=fl?await fxUp(fl,id):null;const {data,error}=await sb.rpc('fluxo_retirar',{p_id:id,p_foto:url});if(error)throw error;
     if(data==='ok'||data==='ja_retirado'){c();toast(data==='ok'?'Retirada registrada ✔ — agora leve e deixe no local de destino':'Este pedido já havia sido retirado');await carregaRC()}
     else{b.disabled=false;er.textContent=fxErr(data)}}
+   catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}})}
+// Trocar a foto do recolhimento/retirada enquanto o pedido ainda não foi finalizado (status "recolhido")
+const btTroca=x=>`<div style="margin-top:6px"><button class="btn s o" onclick="trocarFotoRC('${x.id}')">🔄 ${x.foto?'Trocar foto (enviei a errada)':'Incluir foto'}</button></div>`;
+function trocarFotoRC(id){const x=(RC||[]).find(r=>String(r.id)===String(id));if(!x)return;
+ exModal(`<h3>🔄 ${x.foto?'Trocar a foto':'Incluir foto'}</h3><div><strong>${esc(x.tipo==='transferencia'||!x.itens?(x.ferramenta||'Material'):'Lista de materiais ('+((x.itens||[]).length)+' itens)')}</strong><div class="m">${esc(x.local||'')}${x.destino?' ➜ '+esc(x.destino):''}</div></div>
+ ${x.foto?`<div class="m" style="margin-top:10px">Foto atual (será substituída):</div><img src="${esc(x.foto)}" style="max-width:100%;max-height:200px;border-radius:8px;opacity:.75;border:2px dashed #c0392b">`:''}
+ <label>📷 Nova foto (obrigatória)</label><input type="file" id="tf1" accept="image/*" capture="environment"><div id="tf2" style="margin:8px 0"></div><div class="err" id="tf3"></div>
+ <div class="acts" style="margin-top:14px"><button class="btn" id="tf4" style="flex:1;padding:12px">✔ ${x.foto?'Substituir foto':'Salvar foto'}</button><button class="btn o" id="tf5">Cancelar</button></div>`,
+ (m,c,pv)=>{pv('#tf1','#tf2');m.querySelector('#tf5').onclick=c;
+  m.querySelector('#tf4').onclick=async e=>{const b=e.target,er=m.querySelector('#tf3'),fl=m.querySelector('#tf1').files[0];er.textContent='';if(!fl)return er.textContent='Tire ou escolha a nova foto.';
+   b.disabled=true;er.textContent='Enviando…';
+   try{const url=await fxUp(fl,id);const {data,error}=await sb.rpc('logistica_trocar_foto',{p_id:String(id),p_foto:url});
+    if(error)throw new Error(/logistica_trocar_foto|function|schema cache/i.test(error.message||'')?'a função de troca de foto ainda não foi instalada no banco (rode o arquivo logistica_trocar_foto.sql no Supabase).':error.message);
+    if(data==='ok'){c();toast('Foto substituída ✔');await carregaRC()}else{b.disabled=false;er.textContent=fxErr(data)}}
    catch(x2){b.disabled=false;er.textContent='Erro: '+(x2.message||x2)}}})}
 function fluxoEntregar(id){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
  exModal(`<h3>📷 ② Material deixado no local</h3><div><strong>${esc(x.tipo==='transferencia'?x.ferramenta:'Lista de materiais ('+((x.itens||[]).length)+' itens)')}</strong><div class="m">Destino: <b>${esc(x.destino||'—')}</b></div></div>
