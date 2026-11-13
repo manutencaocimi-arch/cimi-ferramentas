@@ -153,7 +153,7 @@ const dvMsg={senha_necessaria:'Não foi possível validar sua senha. Atualize a 
 const dvRefresh=async()=>{await carregaRC();if(me.papel!=='logistica'){await load();render()}};
 async function desvioPedir(id){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
  const {data:ls,error:le}=await sb.rpc('logistica_locais');if(le)return toast('Erro: '+le.message);const {data:ps,error:pe}=await sb.rpc('logistica_pessoas');
- const pl=(ps||[]).map(x=>typeof x==='string'?{nome:x,funcao:'Pessoas'}:x),gp={};pl.forEach(x=>{const g=x.funcao||'Outros';(gp[g]=gp[g]||[]).push(x.nome)});
+ const pl=(ps||[]).map(x=>typeof x==='string'?{nome:x,funcao:'Pessoas'}:x).sort((a,b)=>porFuncao(a.funcao||'Outros',a.nome,b.funcao||'Outros',b.nome)),gp={};pl.forEach(x=>{const g=x.funcao||'Outros';(gp[g]=gp[g]||[]).push(x.nome)});
  const pops=Object.entries(gp).map(([g,a])=>`<optgroup label="${esc(g)}">${a.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}</optgroup>`).join('');
  const gr={};(ls||[]).forEach(l=>{const g=l.grupo||'Outros';(gr[g]=gr[g]||[]).push(l)});
  const ops=Object.entries(gr).map(([g,a])=>`<optgroup label="${esc(g)}">${a.map(l=>`<option value="${esc(l.id)}">${esc(l.nome)}</option>`).join('')}</optgroup>`).join('');
@@ -661,7 +661,7 @@ function fluxoEntregar(id){const x=(RC||[]).find(r=>r.id===id);if(!x)return;
  <label>Observação (opcional)</label><textarea id="e4" rows="2"></textarea><div class="err" id="e5"></div>
  <div class="acts" style="margin-top:14px"><button class="btn" id="e6" style="flex:1;padding:12px">✔ Confirmar entrega</button><button class="btn o" id="e7">Cancelar</button></div>`,
  (m,c,pv)=>{pv('#e2','#e3');m.querySelector('#e7').onclick=c;
-  (async()=>{const sel=m.querySelector('#e8');try{const {data,error}=await sb.rpc('logistica_pessoas_resp');if(error)throw error;let g=null,h='';(data||[]).forEach(p=>{if(p.funcao!==g){if(g!==null)h+='</optgroup>';g=p.funcao;h+=`<optgroup label="${esc(g||'Sem função')}">`}h+=`<option value="${esc(p.id)}">${esc(p.nome)}</option>`});if(g!==null)h+='</optgroup>';sel.insertAdjacentHTML('beforeend',h)}
+  (async()=>{const sel=m.querySelector('#e8');try{const {data,error}=await sb.rpc('logistica_pessoas_resp');if(error)throw error;let g=null,h='';(data||[]).slice().sort((a,b)=>porFuncao(a.funcao,a.nome,b.funcao,b.nome)).forEach(p=>{if(p.funcao!==g){if(g!==null)h+='</optgroup>';g=p.funcao;h+=`<optgroup label="${esc(g||'Sem função')}">`}h+=`<option value="${esc(p.id)}">${esc(p.nome)}</option>`});if(g!==null)h+='</optgroup>';sel.insertAdjacentHTML('beforeend',h)}
    catch(_){sel.disabled=true;m.querySelector('#e9').textContent='(Lista de pessoas indisponível: rode o arquivo logistica_responsavel.sql no Supabase.)'}})();
   m.querySelector('#e6').onclick=async e=>{const b=e.target,er=m.querySelector('#e5'),on=m.querySelector('#e1').value.trim(),ob=m.querySelector('#e4').value.trim(),fl=m.querySelector('#e2').files[0];er.textContent='';
    if(on.length<3)return er.textContent='Informe onde o material foi deixado.';if(!fl)return er.textContent='Tire a foto do material deixado no local.';
@@ -797,7 +797,10 @@ async function logEdit(tabela,reg,diffs){await sb.from('edicoes').insert(diffs.m
  usuario_id:me.id,usuario_nome:me.nome,nota:'Edição feita mediante a senha de acesso'})))}
 
 // ---------- Ações ----------
-const pessoaFields=sel=>[{k:'pid',l:'👷 Pessoa',t:'select',value:sel,opts:[['','— Selecionar pessoa cadastrada —'],...D.p.filter(p=>p.ativo||p.id===sel).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')).map(p=>[p.id,p.nome,FN(p.funcao_id)?.nome||'Sem função'])]},{k:'outro',l:'Ou digite o nome (se não estiver cadastrada)'}];
+// Ordem das listas de pessoas: Manutencionista, Jardineiro, Pintor (depois as demais funções); dentro de cada grupo, de A a Z
+const FNORD=n=>{n=String(n||'');return /manuten/i.test(n)?0:/jardin/i.test(n)?1:/pint/i.test(n)?2:/log[ií]stic/i.test(n)?3:/sem fun/i.test(n)||!n?9:4};
+const porFuncao=(fa,na,fb,nb)=>FNORD(fa)-FNORD(fb)||String(fa||'').localeCompare(String(fb||''),'pt-BR')||String(na||'').localeCompare(String(nb||''),'pt-BR');
+const pessoaFields=sel=>[{k:'pid',l:'👷 Pessoa',t:'select',value:sel,opts:[['','— Selecionar pessoa cadastrada —'],...D.p.filter(p=>p.ativo||p.id===sel).sort((a,b)=>porFuncao(FN(a.funcao_id)?.nome||'Sem função',a.nome,FN(b.funcao_id)?.nome||'Sem função',b.nome)).map(p=>[p.id,p.nome,FN(p.funcao_id)?.nome||'Sem função'])]},{k:'outro',l:'Ou digite o nome (se não estiver cadastrada)'}];
 const quem=v=>{const p=D.p.find(x=>x.id===v.pid);return{p,nome:p?.nome||v.outro}};
 const LOGG=[['fixo','Logística – fixo'],['eventual','Logística – eventual']];
 const FOTO_OBRIGATORIA=false; // true = o recebedor só confirma se enviar a foto
@@ -932,7 +935,7 @@ const kConfTag=pid=>{if(!kIt(pid).length)return'';const u=kUlt(pid);
  if(!u)return'<span class="pill" style="background:#fff4e5;color:#9a5b00;font-weight:700">⏳ Nunca conferido</span>';
  if(u.resultado==='divergencia')return`<span class="pill" style="background:#fdecea;color:#b42318;font-weight:700">⚠ Divergência na conferência de ${kDt(u.created_at)}</span>`;
  return kVenc(pid)?`<span class="pill" style="background:#fff4e5;color:#9a5b00;font-weight:700">⏳ Conferência vencida (última em ${kDt(u.created_at)})</span>`:`<span class="pill z">✔ Conferido ${kHa(u.created_at)}</span>`};
-const kPesOpts=()=>[['','— Selecionar pessoa —'],...D.p.filter(p=>p.ativo).sort((a,b)=>kFn(a).localeCompare(kFn(b),'pt-BR')||a.nome.localeCompare(b.nome,'pt-BR')).map(p=>[p.id,p.nome,kFn(p)])];
+const kPesOpts=()=>[['','— Selecionar pessoa —'],...D.p.filter(p=>p.ativo).sort((a,b)=>porFuncao(kFn(a),a.nome,kFn(b),b.nome)).map(p=>[p.id,p.nome,kFn(p)])];
 // "1 facão" / "2 enxadas" / "1 roçadeira Stihl 220 | PAT 123" → {quantidade, descricao, patrimonio}
 const kParse=t=>String(t||'').split(/\r?\n/).map(l=>l.trim().replace(/^[-•*]\s*/,'')).filter(Boolean).map(l=>{let [d,pat]=l.split('|').map(s=>s.trim());let qt=1;
  const m=d.match(/^(\d{1,3})\s*(?:x|×|un\.?|unid\.?|-)?\s+(.+)$/i);if(m){qt=+m[1]||1;d=m[2].trim()}
@@ -1099,19 +1102,31 @@ const kTmNome=t=>t.arquivo||('termo'+(/pdf/i.test(t.tipo_arquivo||'')?'.pdf':'.j
 async function kitTermoBaixar(id){const t=(D.kt||[]).find(x=>String(x.id)===String(id));if(!t)return;
  try{const b=await kTmBlob(t),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=kTmNome(t);document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),6e4)}
  catch(e){window.open(t.url+(t.url.includes('?')?'&':'?')+'download='+encodeURIComponent(kTmNome(t)),'_blank')}}
+// Leitor de PDF próprio (PDF.js): funciona mesmo quando o Chrome está configurado para baixar PDFs em vez de abrir
+const PDFJS_V='4.10.38';let PDFJS=null;
+async function pdfjsLib(){if(PDFJS)return PDFJS;const base=`https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_V}/legacy/build/`;
+ const L=await import(base+'pdf.min.mjs');L.GlobalWorkerOptions.workerSrc=base+'pdf.worker.min.mjs';return PDFJS=L}
 async function kitTermoVer(id){const t=(D.kt||[]).find(x=>String(x.id)===String(id));if(!t)return;const p=kP(t.pessoa_id),pdf=/pdf/i.test(t.tipo_arquivo||t.url);
  const m=document.createElement('div');m.className='mask';m.style.zIndex=12;let u=null;const fechar=()=>{m.remove();if(u)URL.revokeObjectURL(u)};m.addEventListener('click',e=>{if(e.target===m)fechar()});
  m.innerHTML=`<div class="modal" style="max-width:1000px;height:92vh;display:flex;flex-direction:column"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><h3 style="margin:0;flex:1">📎 Termo de responsabilidade — ${esc(p?.nome||'')}</h3>
- <button class="btn s o" id="tv1">↗ Abrir em nova aba</button><button class="btn s o" id="tv2">⬇ Baixar</button><button class="btn s" id="tv3">Fechar</button></div>
+ <span id="tvz" style="display:none;gap:4px;align-items:center"><button class="btn s o" id="tvm" title="Diminuir">−</button><span class="m" id="tvp" style="min-width:44px;text-align:center">100%</span><button class="btn s o" id="tvM" title="Aumentar">+</button></span>
+ <button class="btn s o" id="tv2">⬇ Baixar</button><button class="btn s" id="tv3">Fechar</button></div>
  <div class="m" style="margin-bottom:8px">${esc(kTmNome(t))} · assinado em ${kDt(t.data_termo)} · anexado por ${esc(t.usuario_nome||'—')}</div>
- <div id="tv4" style="flex:1;min-height:0;border:1px solid var(--b);border-radius:8px;overflow:auto;background:#f6f8f7;display:flex;align-items:center;justify-content:center"><span class="m">Carregando…</span></div></div>`;
+ <div id="tv4" style="flex:1;min-height:0;border:1px solid var(--b);border-radius:8px;overflow:auto;background:#e9edeb;padding:10px;text-align:center"><span class="m">Carregando o termo…</span></div></div>`;
  document.body.appendChild(m);m.querySelector('#tv3').onclick=fechar;m.querySelector('#tv2').onclick=()=>kitTermoBaixar(id);
- m.querySelector('#tv1').onclick=()=>window.open(u||t.url,'_blank');
- const box=m.querySelector('#tv4');
- try{u=URL.createObjectURL(await kTmBlob(t))}catch(e){u=null}
- const src=u||t.url;
- box.innerHTML=pdf?`<iframe src="${esc(src)}" title="Termo" style="width:100%;height:100%;border:0;background:#fff"></iframe>`:`<img src="${esc(src)}" alt="Termo" style="max-width:100%;max-height:100%;object-fit:contain;cursor:zoom-in">`;
- const im=box.querySelector('img');if(im)im.onclick=()=>{const z=im.style.maxWidth==='none';im.style.maxWidth=im.style.maxHeight=z?'100%':'none';im.style.cursor=z?'zoom-in':'zoom-out';box.style.alignItems=box.style.justifyContent=z?'center':'flex-start'}}
+ const box=m.querySelector('#tv4');let blob=null;
+ try{blob=await kTmBlob(t);u=URL.createObjectURL(blob)}catch(e){}
+ if(!pdf){const im=new Image();im.src=u||t.url;im.alt='Termo';im.style.cssText='max-width:100%;cursor:zoom-in;background:#fff';box.innerHTML='';box.appendChild(im);
+  im.onclick=()=>{const z=im.style.maxWidth==='none';im.style.maxWidth=z?'100%':'none';im.style.cursor=z?'zoom-in':'zoom-out'};return}
+ try{const L=await pdfjsLib(),doc=await L.getDocument(blob?{data:new Uint8Array(await blob.arrayBuffer())}:{url:t.url}).promise;
+  let zoom=1;const pages=[];for(let i=1;i<=doc.numPages;i++)pages.push(await doc.getPage(i));
+  const desenha=async()=>{if(!m.isConnected)return;box.innerHTML='';const larg=Math.max(300,box.clientWidth-24),dpr=window.devicePixelRatio||1;m.querySelector('#tvp').textContent=Math.round(zoom*100)+'%';
+   for(const pg of pages){const v0=pg.getViewport({scale:1}),sc=larg/v0.width*zoom,v=pg.getViewport({scale:sc*dpr}),cv=document.createElement('canvas');
+    cv.width=Math.floor(v.width);cv.height=Math.floor(v.height);cv.style.cssText=`width:${Math.floor(v.width/dpr)}px;height:${Math.floor(v.height/dpr)}px;display:block;margin:0 auto 10px;background:#fff;box-shadow:0 1px 4px #0003`;box.appendChild(cv);
+    await pg.render({canvasContext:cv.getContext('2d'),canvas:cv,viewport:v}).promise}};
+  const z=m.querySelector('#tvz');z.style.display='inline-flex';m.querySelector('#tvm').onclick=()=>{zoom=Math.max(.5,zoom-.25);desenha()};m.querySelector('#tvM').onclick=()=>{zoom=Math.min(3,zoom+.25);desenha()};
+  await desenha()}
+ catch(e){box.innerHTML=`<div style="padding:30px"><p><b>Não foi possível mostrar o PDF aqui.</b></p><p class="m">${esc(e.message||e)}</p><button class="btn" onclick="kitTermoBaixar('${t.id}')">⬇ Baixar o termo</button></div>`}}
 function kitTermoAnexar(pid){const p=kP(pid);if(!p)return;if(D.ktErr)return toast('Rode o arquivo kits_termos.sql no Supabase para ativar os anexos.');
  const m=document.createElement('div');m.className='mask';
  m.innerHTML=`<div class="modal"><h3>📎 Anexar termo de responsabilidade</h3><div class="m">${esc(p.nome)} · ${esc(kFn(p))}</div>
@@ -1148,7 +1163,7 @@ function kitRel(tipo){const ps=kLista();if(!ps.length)return toast('Nenhuma pess
 // ---------- Telas ----------
 function render(){
  const tabs=[['painel','🧰 Ferramentas'],['hist','🕘 Movimentações'],['locais','📍 Locais'],['pessoas','👷 Pessoas'],['kits','🎒 Kits pessoais'+((()=>{const n=(D.p||[]).filter(p=>kDiv(p.id)).length;return n?' <span class="pill u" title="Kits com divergência na última conferência">'+n+'</span>':''})())],['funcoes','🏷️ Funções'],['edic','✏️ Edições']];{const nr=rcPend().length+rcRec().length;tabs.push(['recol','🚚 Recolhimentos'+(nr?' <span class="pill u">'+nr+'</span>':'')]);const na=aprPend().length;tabs.push(['aprov','🔀 Aprovações'+(na?' <span class="pill u">'+na+'</span>':'')])}if(me.papel==='principal')tabs.push(['acessos','🔑 Acessos']);
- $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas <span style="font-size:11px;font-weight:400;opacity:.75">versão 11/11 18h10</span></h1><small>${esc(me.nome)} (${meCargo()||(me.papel==='principal'?'principal':'correlato')})</small><button class="btn o s" onclick="sair()">Sair</button></header>
+ $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas <span style="font-size:11px;font-weight:400;opacity:.75">versão 12/11 09h45</span></h1><small>${esc(me.nome)} (${meCargo()||(me.papel==='principal'?'principal':'correlato')})</small><button class="btn o s" onclick="sair()">Sair</button></header>
  <nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';q='';render()">${t[1]}</button>`).join('')}</nav><main>${{painel,hist:histView,locais,pessoas,kits,funcoes,edic,acessos,recol:recolHtml,aprov:aprovView}[tab]()}</main>`;
  const s=$('#q');if(s){s.oninput=e=>{if(!e.inputType){e.target.value=q;return}q=e.target.value;const p=e.target.selectionStart;render();const n=$('#q');n.focus();n.setSelectionRange(p,p)}}
  if(kReabre){const k=kReabre;kReabre=null;kitVer(k)}}
