@@ -968,7 +968,7 @@ function kits(){
  <div class="cards">${cards}</div>
  <div class="m" style="margin:-4px 0 10px">Mostrando <b style="display:inline;font-size:inherit">${r.length}</b> pessoa(s). Na busca você também pode digitar o nome de uma ferramenta para saber com quem ela está.</div>
  <div class="bar"><input id="q" name="busca_cimi" autocomplete="off" data-lpignore="true" placeholder="🔎 Buscar pessoa, função ou ferramenta do kit (ex.: roçadeira)..." value="${esc(q)}">
- <button class="btn" onclick="kitAdd()">+ Adicionar itens a um kit</button><button class="btn y" onclick="kitRel('print')">🖨️ Imprimir</button><button class="btn" onclick="kitRel('pdf')">📄 PDF</button><button class="btn o" onclick="kitRel('xlsx')">📊 Excel</button></div>
+ <button class="btn" onclick="kitAdd()">+ Adicionar itens a um kit</button><button class="btn o" title="Anexe o termo (Word ou PDF): o sistema identifica a pessoa e inclui os itens com patrimônio e valor" onclick="kitTermoAnexar()">📄 Importar termo</button><button class="btn y" onclick="kitRel('print')">🖨️ Imprimir</button><button class="btn" onclick="kitRel('pdf')">📄 PDF</button><button class="btn o" onclick="kitRel('xlsx')">📊 Excel</button></div>
  <div class="lg">${r.map(tile).join('')||'<p class="m">Nenhuma pessoa encontrada.</p>'}</div>`}
 
 function kitVer(pid){const p=kP(pid);if(!p)return;const it=kIt(pid),en=kEnc(pid),cf=kCf(pid),u=cf[0],c=fcor(p.funcao_id),fn=kFn(p);
@@ -980,7 +980,7 @@ function kitVer(pid){const p=kP(pid);if(!p)return;const it=kIt(pid),en=kEnc(pid)
  <div style="display:flex;gap:12px;align-items:center"><div style="width:46px;height:46px;border-radius:50%;background:${c};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex:none">${esc(p.nome.trim()[0]||'?')}</div>
  <div><h3 style="margin:0">🎒 Kit de ${esc(p.nome)}</h3><div class="m">${kIc(fn)} ${esc(fn)} · ${it.length} ${it.length===1?'item':'itens'} · ${kUn(it)} unidade(s)</div></div><div style="margin-left:auto;text-align:right"><div class="m">Valor sob responsabilidade</div><div style="font-size:22px;font-weight:800;color:var(--t)">💰 ${kBRL(kTot(it))}</div>${kSemV(it)?`<div class="m" style="color:#9a5b00">${kSemV(it)} item(ns) sem valor informado</div>`:''}</div></div>
  <div style="margin:10px 0">${kConfTag(pid)}</div>
- <div class="acts" style="margin-bottom:10px"><button class="btn" onclick="kitAdd('${p.id}')">+ Adicionar itens</button>${it.length?`<button class="btn y" onclick="kitConferir('${p.id}')">✔ Fazer conferência</button>`:''}<button class="btn o" onclick="kitTermoAnexar('${p.id}')">📎 Anexar termo assinado</button></div>
+ <div class="acts" style="margin-bottom:10px"><button class="btn" onclick="kitAdd('${p.id}')">+ Adicionar itens</button>${it.length?`<button class="btn y" onclick="kitConferir('${p.id}')">✔ Fazer conferência</button>`:''}<button class="btn o" onclick="kitTermoAnexar('${p.id}')">📎 Anexar / importar termo</button></div>
  <div class="tw"><table><tr><th>Qtd</th><th>Item</th><th>Tipo</th><th>Patrimônio</th><th style="text-align:right">Valor</th><th>Estado</th><th>Com a pessoa desde</th><th>Última conferência</th><th>Ações</th></tr>
  ${it.map(x=>`<tr><td><b>${x.quantidade}</b></td><td><b>${esc(x.descricao)}</b>${x.recolhimento_id?' <span class="pill" title="Deixado com a pessoa pela Logística">🚚 via Logística</span>':''}${x.obs?`<div class="m">${esc(x.obs)}</div>`:''}</td><td style="white-space:nowrap">${esc(kTipoTxt(x.tipo))}</td><td>${esc(kPatTxt(x))}</td><td style="text-align:right;white-space:nowrap">${kVal(x)==null?'<span class="m">—</span>':`<b>${kBRL(kVal(x))}</b>${(+x.quantidade||1)>1?`<div class="m">${x.quantidade} × ${kBRL(x.valor_unit)}</div>`:''}`}</td><td>${x.estado==='ruim'?'<b style="color:var(--r)">'+esc(KEST[x.estado])+'</b>':esc(KEST[x.estado]||x.estado||'—')}</td><td>${kDt(x.entregue_em)}<div class="m">${esc(x.entregue_por||'')}</div></td><td>${sit(x)}</td>
  <td><div class="acts" style="flex-wrap:nowrap"><button class="btn s o" title="Editar item" onclick="kitEdit('${x.id}')">✏️</button><button class="btn s o" title="Devolver ao CIMI, dar baixa ou passar para outra pessoa" onclick="kitDevolver('${x.id}')">↩ Tirar do kit</button>${me.papel==='principal'?`<button class="btn s o" style="color:#c0392b;border-color:#c0392b" title="Excluir lançamento errado" onclick="kitExcluir('${x.id}')">🗑</button>`:''}</div></td></tr>`).join('')||'<tr><td colspan=9 class="m">Nenhum item no kit desta pessoa. Clique em “+ Adicionar itens”.</td></tr>'}</table></div>
@@ -1100,10 +1100,10 @@ function kitConferir(pid){const p=kP(pid),it=kIt(pid);if(!p)return;if(!it.length
   catch(x){er.textContent='Erro: '+(x.message||x);b.disabled=false}}}
 
 const kTermosHtml=pid=>{const tm=kTm(pid);if(D.ktErr)return`<div class="m" style="margin-top:14px">📎 Termos: rode o arquivo <b>kits_termos.sql</b> no Supabase para ativar os anexos.</div>`;
- return`<h4 style="margin:18px 0 6px">📎 Termo de responsabilidade (${tm.length})</h4>${tm.map((t,i)=>`<div class="tl" style="border-left-color:${i?'var(--b)':'#7b4fc4'}"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn s ${i?'o':''}" title="Ver o termo aqui na tela, sem baixar" onclick="kitTermoVer('${t.id}')">👁 Ver ${i?'versão anterior':'termo atual'}</button><button class="btn s o" title="Baixar o arquivo do termo" onclick="kitTermoBaixar('${t.id}')">${/pdf/i.test(t.tipo_arquivo||t.url)?'📄':'🖼️'} Abrir ${i?'versão anterior':'termo atual'}</button><span class="m">${esc(t.arquivo||'')}</span>${me.papel==='principal'?`<button class="btn s o" style="color:#c0392b;border-color:#c0392b" title="Remover anexo enviado por engano" onclick="kitTermoExcluir('${t.id}')">🗑</button>`:''}</div>
+ return`<h4 style="margin:18px 0 6px">📎 Termo de responsabilidade (${tm.length})</h4>${tm.map((t,i)=>`<div class="tl" style="border-left-color:${i?'var(--b)':'#7b4fc4'}"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn s ${i?'o':''}" title="Ver o termo aqui na tela, sem baixar" onclick="kitTermoVer('${t.id}')">👁 Ver ${i?'versão anterior':'termo atual'}</button><button class="btn s o" title="Baixar o arquivo do termo" onclick="kitTermoBaixar('${t.id}')">${kEhDocx(t)?'📝':/pdf/i.test(t.tipo_arquivo||t.url)?'📄':'🖼️'} Abrir ${i?'versão anterior':'termo atual'}</button><span class="m">${esc(t.arquivo||'')}</span>${me.papel==='principal'?`<button class="btn s o" style="color:#c0392b;border-color:#c0392b" title="Remover anexo enviado por engano" onclick="kitTermoExcluir('${t.id}')">🗑</button>`:''}</div>
  <div class="m">Assinado em ${kDt(t.data_termo)} · anexado por ${esc(t.usuario_nome||'—')} em ${fmt(t.created_at)}${t.obs?' · '+esc(t.obs):''}</div></div>`).join('')||'<p class="m">Nenhum termo anexado ainda. Clique em “📎 Anexar termo assinado”.</p>'}`};
 const kTmBlob=async t=>{const r=await fetch(t.url);if(!r.ok)throw new Error('arquivo não encontrado ('+r.status+')');const b=await r.blob();return new Blob([b],{type:t.tipo_arquivo||b.type||'application/octet-stream'})};
-const kTmNome=t=>t.arquivo||('termo'+(/pdf/i.test(t.tipo_arquivo||'')?'.pdf':'.jpg'));
+const kTmNome=t=>t.arquivo||('termo'+(kEhDocx(t)?'.docx':/pdf/i.test(t.tipo_arquivo||'')?'.pdf':'.jpg'));
 async function kitTermoBaixar(id){const t=(D.kt||[]).find(x=>String(x.id)===String(id));if(!t)return;
  try{const b=await kTmBlob(t),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=kTmNome(t);document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),6e4)}
  catch(e){window.open(t.url+(t.url.includes('?')?'&':'?')+'download='+encodeURIComponent(kTmNome(t)),'_blank')}}
@@ -1121,6 +1121,9 @@ async function kitTermoVer(id){const t=(D.kt||[]).find(x=>String(x.id)===String(
  document.body.appendChild(m);m.querySelector('#tv3').onclick=fechar;m.querySelector('#tv2').onclick=()=>kitTermoBaixar(id);
  const box=m.querySelector('#tv4');let blob=null;
  try{blob=await kTmBlob(t);u=URL.createObjectURL(blob)}catch(e){}
+ if(kEhDocx(t)){box.style.textAlign='left';try{if(!blob)throw new Error('não foi possível baixar o arquivo');const bl=await kDocxBlocos(await blob.arrayBuffer());
+  box.innerHTML=`<div style="background:#fff;max-width:820px;margin:0 auto;padding:28px 34px;box-shadow:0 1px 4px #0003;font-size:13px;line-height:1.55;color:#111">${bl.map(x=>x.p?`<p style="margin:0 0 10px">${esc(x.p)}</p>`:`<table style="width:100%;border-collapse:collapse;margin:10px 0;font-size:12px">${x.tbl.map((r,i)=>`<tr>${r.map(c=>`<${i?'td':'th'} style="border:1px solid #999;padding:4px 6px;text-align:left;${i?'':'background:#eef3ef'}">${esc(c)}</${i?'td':'th'}>`).join('')}</tr>`).join('')}</table>`).join('')}</div>`}
+  catch(e){box.innerHTML=`<div style="padding:30px;text-align:center"><p><b>Não foi possível mostrar o Word aqui.</b></p><p class="m">${esc(e.message||e)}</p><button class="btn" onclick="kitTermoBaixar('${t.id}')">⬇ Baixar o termo</button></div>`}return}
  if(!pdf){const im=new Image();im.src=u||t.url;im.alt='Termo';im.style.cssText='max-width:100%;cursor:zoom-in;background:#fff';box.innerHTML='';box.appendChild(im);
   im.onclick=()=>{const z=im.style.maxWidth==='none';im.style.maxWidth=z?'100%':'none';im.style.cursor=z?'zoom-in':'zoom-out'};return}
  try{const L=await pdfjsLib(),doc=await L.getDocument(blob?{data:new Uint8Array(await blob.arrayBuffer())}:{url:t.url}).promise;
@@ -1132,24 +1135,113 @@ async function kitTermoVer(id){const t=(D.kt||[]).find(x=>String(x.id)===String(
   const z=m.querySelector('#tvz');z.style.display='inline-flex';m.querySelector('#tvm').onclick=()=>{zoom=Math.max(.5,zoom-.25);desenha()};m.querySelector('#tvM').onclick=()=>{zoom=Math.min(3,zoom+.25);desenha()};
   await desenha()}
  catch(e){box.innerHTML=`<div style="padding:30px"><p><b>Não foi possível mostrar o PDF aqui.</b></p><p class="m">${esc(e.message||e)}</p><button class="btn" onclick="kitTermoBaixar('${t.id}')">⬇ Baixar o termo</button></div>`}}
-function kitTermoAnexar(pid){const p=kP(pid);if(!p)return;if(D.ktErr)return toast('Rode o arquivo kits_termos.sql no Supabase para ativar os anexos.');
- const m=document.createElement('div');m.className='mask';
- m.innerHTML=`<div class="modal"><h3>📎 Anexar termo de responsabilidade</h3><div class="m">${esc(p.nome)} · ${esc(kFn(p))}</div>
- <label>Arquivo do termo assinado (PDF ou foto — obrigatório)</label><input type="file" id="ta1" accept="application/pdf,image/*"><div id="ta2" class="m" style="margin:6px 0"></div>
+// ---------- Leitura automática do Termo de Responsabilidade (Word .docx ou PDF gerado pelo Word) ----------
+const kNorm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim().toLowerCase();
+const kDocxTipo='application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const kEhDocx=f=>/\.docx$/i.test(f?.name||f?.arquivo||'')||/wordprocessingml/i.test(f?.type||f?.tipo_arquivo||'');
+const kEhPdf=f=>/\.pdf$/i.test(f?.name||f?.arquivo||'')||/pdf/i.test(f?.type||f?.tipo_arquivo||'');
+// lê um arquivo de dentro do .docx (que é um .zip) usando o descompactador do próprio navegador
+async function kZipLer(buf,nome){const v=new DataView(buf),u8=new Uint8Array(buf),td=new TextDecoder();let e=u8.length-22;
+ while(e>=0&&v.getUint32(e,true)!==0x06054b50)e--;if(e<0)throw new Error('o arquivo não é um Word (.docx) válido');
+ let p=v.getUint32(e+16,true);const n=v.getUint16(e+10,true);
+ for(let i=0;i<n;i++){const met=v.getUint16(p+10,true),cs=v.getUint32(p+20,true),fl=v.getUint16(p+28,true),xl=v.getUint16(p+30,true),cl=v.getUint16(p+32,true),off=v.getUint32(p+42,true),fn=td.decode(u8.subarray(p+46,p+46+fl));
+  if(fn===nome){const st=off+30+v.getUint16(off+26,true)+v.getUint16(off+28,true),dt=u8.subarray(st,st+cs);if(met===0)return td.decode(dt);
+   if(typeof DecompressionStream==='undefined')throw new Error('navegador sem suporte para abrir .docx — atualize o navegador');
+   return td.decode(await new Response(new Blob([dt]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer())}
+  p+=46+fl+xl+cl}
+ throw new Error('conteúdo do Word não encontrado')}
+// transforma o Word em blocos: parágrafos e tabelas (linhas × células)
+async function kDocxBlocos(buf){const W='http://schemas.openxmlformats.org/wordprocessingml/2006/main',d=new DOMParser().parseFromString(await kZipLer(buf,'word/document.xml'),'application/xml');
+ const tx=el=>{let s='';const an=n=>{for(const c of n.childNodes){if(c.namespaceURI!==W){an(c);continue}const t=c.localName;if(t==='t')s+=c.textContent;else if(t==='tab')s+=' ';else if(t==='br'||t==='cr')s+=' ';else if(t!=='rPr'&&t!=='pPr')an(c)}};an(el);return s.replace(/\s+/g,' ').trim()};
+ const body=d.getElementsByTagNameNS(W,'body')[0],out=[];if(!body)throw new Error('Word sem conteúdo');
+ for(const c of body.children){if(c.localName==='p'){const t=tx(c);if(t)out.push({p:t})}
+  else if(c.localName==='tbl'){const rows=[...c.children].filter(r=>r.localName==='tr').map(r=>[...r.children].filter(x=>x.localName==='tc').map(tc=>[...tc.children].filter(x=>x.localName==='p').map(tx).filter(Boolean).join(' / ')));out.push({tbl:rows})}}
+ return out}
+const KMES={janeiro:1,fevereiro:2,marco:3,abril:4,maio:5,junho:6,julho:7,agosto:8,setembro:9,outubro:10,novembro:11,dezembro:12};
+const kSemPat=t=>!t||/^(n|ñ|nao)\s*tem$|^-+$|^n\/?a$|^nao possui$|^sem$/i.test(kNorm(t).replace(/[.]/g,''));
+// dados do cabeçalho do termo (nº, nome, matrícula, data) a partir do texto corrido
+function kTermoCab(txt){const r={};let m=txt.match(/n\s*[°º.]\s*(\d+\s*\/\s*\d{4})/i);if(m)r.numero=m[1].replace(/\s/g,'');
+ m=txt.match(/\beu,?\s+(.+?),\s*matr[ií]cula\s*(?:n\s*[°º.]?\s*)?:?\s*(\d+)/i);if(m){r.nome=m[1].trim();r.matricula=m[2]}
+ m=kNorm(txt).match(/(\d{1,2})\s+de\s+([a-z]+)\s+de\s+(\d{4})/);if(m&&KMES[m[2]])r.data=`${m[3]}-${String(KMES[m[2]]).padStart(2,'0')}-${m[1].padStart(2,'0')}`;return r}
+function kTermoDeBlocos(bl){const r=kTermoCab(bl.filter(b=>b.p).map(b=>b.p).join(' '));r.itens=[];
+ for(const b of bl){if(!b.tbl||!b.tbl.length)continue;const h=b.tbl[0].map(kNorm),ix=f=>h.findIndex(f);
+  const iD=ix(c=>c.includes('descri')),iQ=ix(c=>c.startsWith('quant')||c.startsWith('qtd')||c==='qtde'),iP=ix(c=>c.includes('patrim')),iV=ix(c=>c.includes('unit')||c.includes('valor')||c.includes('r$'));
+  if(iD<0||(iQ<0&&iV<0))continue;
+  for(const row of b.tbl.slice(1)){const c=i=>i>=0?(row[i]||'').trim():'';if(row.some(x=>kNorm(x)==='total')){const v=kNum(row[row.length-1]);if(v>0)r.total=v;continue}
+   const de=c(iD);if(!de)continue;const vv=kNum(c(iV));
+   r.itens.push({descricao:de,quantidade:Math.max(1,parseInt(c(iQ))||1),patrimonio:kSemPat(c(iP))?null:c(iP),valor_unit:Number.isNaN(vv)?null:vv})}
+  if(r.itens.length)break}
+ return r}
+async function kPdfLinhas(buf){const L=await pdfjsLib(),doc=await L.getDocument({data:new Uint8Array(buf)}).promise,out=[];
+ for(let i=1;i<=doc.numPages;i++){const tc=await (await doc.getPage(i)).getTextContent(),its=tc.items.filter(t=>t.str.trim()).sort((a,b)=>b.transform[5]-a.transform[5]),gr=[];
+  // agrupa pedaços de texto que estão praticamente na mesma altura (tolerância de 6 pontos) numa mesma linha
+  its.forEach(t=>{const y=t.transform[5],g=gr[gr.length-1];if(g&&Math.abs(g.y-y)<=6)g.t.push(t);else gr.push({y,t:[t]})});
+  gr.forEach(g=>out.push(g.t.sort((a,b)=>a.transform[4]-b.transform[4]).map(t=>t.str).join(' ').replace(/\s+/g,' ').trim()))}
+ return out}
+function kTermoDePdf(lin){const r=kTermoCab(lin.join(' '));r.itens=[];
+ const re=/^(\d{1,3})\s+(.+?)\s+(ñ\s*tem|n\s*tem|n[ãa]o\s*tem|-|[A-Z]{0,5}\d{4,}\S*)\s+(\d{1,4})\s+R\$\s*([\d.]+,\d{2})$/i;
+ lin.forEach(l=>{const t=l.match(/^total\b.*?R\$\s*([\d.]+,\d{2})/i);if(t){r.total=kNum(t[1]);return}const m=l.match(re);if(!m)return;
+  r.itens.push({descricao:m[2].trim(),quantidade:Math.max(1,parseInt(m[4])||1),patrimonio:kSemPat(m[3])?null:m[3],valor_unit:kNum(m[5])})});
+ return r}
+async function kLerTermo(f){const buf=await f.arrayBuffer();
+ if(kEhDocx(f))return kTermoDeBlocos(await kDocxBlocos(buf));
+ if(kEhPdf(f)){const l=await kPdfLinhas(buf);if(!l.length)throw new Error('este PDF é uma imagem escaneada — não dá para ler o texto. Anexe o Word (.docx) ou o PDF gerado pelo Word.');return kTermoDePdf(l)}
+ return null}
+const kAcharPessoa=n=>{const k=kNorm(n);if(!k)return null;return D.p.find(p=>kNorm(p.nome)===k)||D.p.find(p=>p.ativo&&(kNorm(p.nome).includes(k)||k.includes(kNorm(p.nome))))||null};
+
+function kitTermoAnexar(pid){const p0=pid?kP(pid):null;if(pid&&!p0)return;if(D.ktErr)return toast('Rode o arquivo kits_termos.sql no Supabase para ativar os anexos.');
+ const m=document.createElement('div');m.className='mask';let lido=null;
+ const pesSel=()=>{let h='',g=null;kPesOpts().forEach(o=>{if(o[2]!==g){if(g)h+='</optgroup>';g=o[2];if(g)h+=`<optgroup label="${esc(g)}">`}h+=`<option value="${esc(o[0])}">${esc(o[1])}</option>`});return h+(g?'</optgroup>':'')};
+ m.innerHTML=`<div class="modal" style="max-width:860px"><h3>📎 ${p0?'Anexar termo de responsabilidade':'Importar termo de responsabilidade'}</h3>${p0?`<div class="m">${esc(p0.nome)} · ${esc(kFn(p0))}</div>`:''}
+ <label>Arquivo do termo (Word .docx, PDF ou foto — obrigatório)</label><input type="file" id="ta1" accept=".docx,.pdf,image/*,application/pdf,${kDocxTipo}">
+ <div class="m">Anexando o <b>Word (.docx)</b> ou o <b>PDF gerado pelo Word</b>, o sistema lê a tabela do termo e já prepara os itens com patrimônio, quantidade e valor.</div>
+ <div id="ta2" style="margin:8px 0"></div>
+ ${p0?'':`<label>👷 Pessoa responsável</label><select id="tap"><option value="">— Selecionar pessoa —</option>${pesSel()}</select>`}
+ <div id="tai"></div>
  <label>Data da assinatura</label><input type="date" id="ta3" value="${kHoje()}">
  <label>Observação (opcional)</label><input id="ta4" placeholder="Ex.: termo atualizado após inclusão da roçadeira">
  <div class="err" id="ta5"></div><div class="acts" style="margin-top:14px"><button class="btn" id="ta6">📎 Anexar</button><button class="btn o" id="ta7">Cancelar</button></div></div>`;
- document.body.appendChild(m);m.querySelector('#ta7').onclick=()=>m.remove();
- m.querySelector('#ta1').onchange=e=>{const f=e.target.files[0];m.querySelector('#ta2').innerHTML=!f?'':/^image\//.test(f.type)?`<img src="${URL.createObjectURL(f)}" style="max-width:100%;max-height:220px;border-radius:8px">`:`📄 ${esc(f.name)} (${(f.size/1048576).toFixed(1)} MB)`};
- m.querySelector('#ta6').onclick=async e=>{const b=e.target,er=m.querySelector('#ta5'),f=m.querySelector('#ta1').files[0];er.textContent='';
-  if(!f)return er.textContent='Escolha o arquivo do termo assinado.';if(!/pdf|image\//i.test(f.type))return er.textContent='Envie um PDF ou uma foto.';if(f.size>15*1048576)return er.textContent='Arquivo muito grande (máx. 15 MB).';
-  b.disabled=true;er.textContent='Enviando…';
-  try{const ext=(f.name.match(/\.[a-z0-9]+$/i)||[/pdf/i.test(f.type)?'.pdf':'.jpg'])[0].toLowerCase(),pa=`kits/termos/${pid}/${Date.now()}${ext}`;
-   const {error:ue}=await sb.storage.from('fotos').upload(pa,f,{contentType:f.type});if(ue)throw new Error(ue.message+(/mime|type/i.test(ue.message)?' (o armazenamento "fotos" não aceita este tipo de arquivo; tente enviar uma foto do termo)':''));
-   const url=sb.storage.from('fotos').getPublicUrl(pa).data.publicUrl,dv=m.querySelector('#ta3').value;
-   const {error}=await sb.from('kit_termos').insert({pessoa_id:p.id,url,arquivo:f.name,tipo_arquivo:f.type,data_termo:dv||null,obs:m.querySelector('#ta4').value.trim()||null,usuario_id:me.id,usuario_nome:me.nome});if(error)throw error;
-   await logEdit('kits',p.nome+' — termo de responsabilidade',[['termo anexado','',f.name]]);
-   m.remove();kReabre=p.id;toast('Termo anexado ✔');await load();render()}
+ document.body.appendChild(m);const $m=s=>m.querySelector(s),pidAtual=()=>p0?p0.id:$m('#tap').value;m.querySelector('#ta7').onclick=()=>m.remove();
+ const desenhaItens=()=>{const box=$m('#tai');if(!lido||!lido.itens.length){box.innerHTML='';return}
+  const pp=kP(pidAtual()),ex=new Set(pp?kIt(pp.id).map(x=>kNorm(x.descricao)+'|'+kNorm(x.patrimonio)):[]),soma=lido.itens.reduce((s,x)=>s+(x.valor_unit||0)*x.quantidade,0);
+  const dif=lido.total!=null&&Math.abs(soma-lido.total)>0.009,nomeOk=!lido.nome||!pp||kNorm(pp.nome)===kNorm(lido.nome),tp=kTipoDe(pp)||'';
+  box.innerHTML=`<div class="card" style="margin:10px 0;border-left:6px solid var(--g);padding:12px">
+  <div style="font-weight:700">📋 Lido do termo${lido.numero?' nº '+esc(lido.numero):''}: ${lido.itens.length} ${lido.itens.length===1?'item':'itens'} · ${kBRL(soma)}</div>
+  <div class="m">${lido.nome?`Colaborador no termo: <strong>${esc(lido.nome)}</strong>${lido.matricula?' (matrícula '+esc(lido.matricula)+')':''}`:''}${lido.data?' · assinado em '+kDt(lido.data):''}</div>
+  ${lido.total!=null?`<div class="m" style="color:${dif?'#b42318':'#1e7a3c'};font-weight:700">${dif?`⚠ A soma dos itens (${kBRL(soma)}) é diferente do TOTAL do termo (${kBRL(lido.total)}). Confira os valores.`:`✔ A soma dos itens confere com o TOTAL do termo (${kBRL(lido.total)}).`}</div>`:''}
+  ${!nomeOk?`<div style="color:#b42318;font-weight:700;margin-top:4px">⚠ O nome no termo (${esc(lido.nome)}) é diferente da pessoa escolhida (${esc(pp.nome)}).</div>`:''}
+  <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-weight:700"><input type="checkbox" id="tim" checked style="width:auto"> ➕ Adicionar ao kit os itens marcados abaixo</label>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0"><span class="m">Tipo de material dos itens:</span><select id="tit" style="width:auto">${[['','— Tipo —'],...KTIPOS].map(o=>`<option value="${esc(o[0])}" ${o[0]===tp?'selected':''}>${esc(o[1])}</option>`).join('')}</select>
+  <button class="btn s o" id="tia">Marcar todos</button><button class="btn s o" id="tin">Desmarcar todos</button></div>
+  <div class="tw" style="max-height:300px;overflow:auto"><table><tr><th></th><th>Qtd</th><th>Item</th><th>Patrimônio</th><th style="text-align:right">R$ unit.</th><th style="text-align:right">Total</th></tr>
+  ${lido.itens.map((x,i)=>{const dup=ex.has(kNorm(x.descricao)+'|'+kNorm(x.patrimonio));return`<tr style="${dup?'opacity:.55':''}"><td><input type="checkbox" class="tic" data-i="${i}" ${dup?'':'checked'} style="width:auto"></td><td>${x.quantidade}</td><td>${esc(x.descricao)}${dup?' <span class="pill">já está no kit</span>':''}</td><td>${x.patrimonio?esc(x.patrimonio):'Não'}</td><td style="text-align:right;white-space:nowrap">${x.valor_unit!=null?kBRL(x.valor_unit):'—'}</td><td style="text-align:right;white-space:nowrap">${x.valor_unit!=null?kBRL(x.valor_unit*x.quantidade):'—'}</td></tr>`}).join('')}</table></div></div>`;
+  $m('#tia').onclick=()=>m.querySelectorAll('.tic').forEach(c=>c.checked=true);$m('#tin').onclick=()=>m.querySelectorAll('.tic').forEach(c=>c.checked=false);
+  $m('#tim').onchange=e=>m.querySelectorAll('.tic,#tit').forEach(c=>c.disabled=!e.target.checked)};
+ if($m('#tap'))$m('#tap').onchange=desenhaItens;
+ $m('#ta1').onchange=async e=>{const f=e.target.files[0],pv=$m('#ta2');lido=null;$m('#tai').innerHTML='';if(!f){pv.innerHTML='';return}
+  pv.innerHTML=/^image\//.test(f.type)?`<img src="${URL.createObjectURL(f)}" style="max-width:100%;max-height:220px;border-radius:8px">`:`${kEhDocx(f)?'📝':'📄'} ${esc(f.name)} (${(f.size/1048576).toFixed(1)} MB)`;
+  if(!kEhDocx(f)&&!kEhPdf(f))return;pv.insertAdjacentHTML('beforeend','<div class="m">Lendo o termo…</div>');
+  try{lido=await kLerTermo(f);pv.lastElementChild.remove();
+   if(!lido||!lido.itens.length){pv.insertAdjacentHTML('beforeend','<div class="m" style="color:#9a5b00">Não encontrei a tabela de itens neste arquivo. Ele será só anexado; os itens podem ser incluídos em “+ Adicionar itens”.</div>');return}
+   if(lido.data)$m('#ta3').value=lido.data;if(lido.numero&&!$m('#ta4').value)$m('#ta4').value='Termo nº '+lido.numero;
+   if(!p0&&lido.nome){const ac=kAcharPessoa(lido.nome);if(ac)$m('#tap').value=ac.id}
+   desenhaItens()}
+  catch(x){pv.lastElementChild?.remove();pv.insertAdjacentHTML('beforeend',`<div class="m" style="color:#9a5b00">Não foi possível ler os itens: ${esc(x.message||x)}. O arquivo pode ser anexado mesmo assim.</div>`)}};
+ $m('#ta6').onclick=async e=>{const b=e.target,er=$m('#ta5'),f=$m('#ta1').files[0];er.textContent='';
+  const p=kP(pidAtual());if(!p)return er.textContent='Escolha a pessoa responsável pelo termo.';
+  if(!f)return er.textContent='Escolha o arquivo do termo.';if(!kEhDocx(f)&&!kEhPdf(f)&&!/^image\//.test(f.type))return er.textContent='Envie um Word (.docx), PDF ou foto.';if(f.size>15*1048576)return er.textContent='Arquivo muito grande (máx. 15 MB).';
+  const imp=lido&&lido.itens.length&&$m('#tim')?.checked,sel=imp?[...m.querySelectorAll('.tic')].filter(c=>c.checked).map(c=>lido.itens[+c.dataset.i]):[],tipo=$m('#tit')?.value||'';
+  if(imp&&sel.length&&!tipo)return er.textContent='Escolha o tipo de material dos itens.';
+  const dv=$m('#ta3').value,ob=$m('#ta4').value.trim();b.disabled=true;er.textContent='Enviando…';
+  try{const ct=kEhDocx(f)?kDocxTipo:kEhPdf(f)?'application/pdf':f.type,ext=(f.name.match(/\.[a-z0-9]+$/i)||[kEhDocx(f)?'.docx':kEhPdf(f)?'.pdf':'.jpg'])[0].toLowerCase(),pa=`kits/termos/${p.id}/${Date.now()}${ext}`;
+   const {error:ue}=await sb.storage.from('fotos').upload(pa,f,{contentType:ct});if(ue)throw new Error(ue.message+(/mime|type/i.test(ue.message)?' (o armazenamento "fotos" não aceita este tipo de arquivo — libere PDF/Word nas configurações do Storage do Supabase)':''));
+   const url=sb.storage.from('fotos').getPublicUrl(pa).data.publicUrl;
+   let r=await sb.from('kit_termos').insert({pessoa_id:p.id,url,arquivo:f.name,tipo_arquivo:ct,data_termo:dv||null,obs:ob||null,usuario_id:me.id,usuario_nome:me.nome});if(r.error)throw r.error;
+   if(sel.length){const dt=dv?new Date(dv+'T12:00:00').toISOString():new Date().toISOString();
+    r=await sb.from('kit_itens').insert(sel.map(x=>({pessoa_id:p.id,descricao:x.descricao,quantidade:x.quantidade,tipo,tem_patrimonio:!!x.patrimonio,patrimonio:x.patrimonio,valor_unit:x.valor_unit,estado:'bom',obs:'Importado do termo'+(lido.numero?' nº '+lido.numero:''),status:'com_pessoa',entregue_em:dt,entregue_por:me.nome,usuario_id:me.id,usuario_nome:me.nome})));
+    if(r.error)throw new Error('o termo foi anexado, mas os itens não foram incluídos: '+r.error.message)}
+   await logEdit('kits',p.nome+' — termo de responsabilidade',[['termo anexado','',f.name+(sel.length?` (+${sel.length} itens no kit)`:'')]]);
+   m.remove();kReabre=p.id;toast(sel.length?`Termo anexado e ${sel.length} ${sel.length===1?'item incluído':'itens incluídos'} no kit ✔`:'Termo anexado ✔');await load();render()}
   catch(x){b.disabled=false;er.textContent='Erro: '+(x.message||x)}}}
 function kitTermoExcluir(id){const t=(D.kt||[]).find(x=>String(x.id)===String(id));if(!t)return;const p=kP(t.pessoa_id);
  form('🗑 Remover termo anexado',[{k:'aviso',l:'Use só para remover um arquivo enviado por engano.',t:'hidden',value:''},pwField],'Remover',async v=>{
@@ -1168,7 +1260,7 @@ function kitRel(tipo){const ps=kLista();if(!ps.length)return toast('Nenhuma pess
 // ---------- Telas ----------
 function render(){
  const tabs=[['painel','🧰 Ferramentas'],['hist','🕘 Movimentações'],['locais','📍 Locais'],['pessoas','👷 Pessoas'],['kits','🎒 Kits pessoais'+((()=>{const n=(D.p||[]).filter(p=>kDiv(p.id)).length;return n?' <span class="pill u" title="Kits com divergência na última conferência">'+n+'</span>':''})())],['funcoes','🏷️ Funções'],['edic','✏️ Edições']];{const nr=rcPend().length+rcRec().length;tabs.push(['recol','🚚 Recolhimentos'+(nr?' <span class="pill u">'+nr+'</span>':'')]);const na=aprPend().length;tabs.push(['aprov','🔀 Aprovações'+(na?' <span class="pill u">'+na+'</span>':'')])}if(me.papel==='principal')tabs.push(['acessos','🔑 Acessos']);
- $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas <span style="font-size:11px;font-weight:400;opacity:.75">versão 13/11 10h20</span></h1><small>${esc(me.nome)} (${meCargo()||(me.papel==='principal'?'principal':'correlato')})</small><button class="btn o s" onclick="sair()">Sair</button></header>
+ $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas <span style="font-size:11px;font-weight:400;opacity:.75">versão 13/11 10h45</span></h1><small>${esc(me.nome)} (${meCargo()||(me.papel==='principal'?'principal':'correlato')})</small><button class="btn o s" onclick="sair()">Sair</button></header>
  <nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';q='';render()">${t[1]}</button>`).join('')}</nav><main>${{painel,hist:histView,locais,pessoas,kits,funcoes,edic,acessos,recol:recolHtml,aprov:aprovView}[tab]()}</main>`;
  const s=$('#q');if(s){s.oninput=e=>{if(!e.inputType){e.target.value=q;return}q=e.target.value;const p=e.target.selectionStart;render();const n=$('#q');n.focus();n.setSelectionRange(p,p)}}
  if(kReabre){const k=kReabre;kReabre=null;kitVer(k)}}
