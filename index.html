@@ -1154,7 +1154,7 @@ async function kitTermoBaixar(id){const t=(D.kt||[]).find(x=>String(x.id)===Stri
  catch(e){window.open(t.url+(t.url.includes('?')?'&':'?')+'download='+encodeURIComponent(kTmNome(t)),'_blank')}}
 // Leitor de PDF próprio (PDF.js): funciona mesmo quando o Chrome está configurado para baixar PDFs em vez de abrir
 const PDFJS_V='4.10.38';let PDFJS=null;
-async function pdfjsLib(){if(PDFJS)return PDFJS;const base=`https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_V}/legacy/build/`;
+async function kPdfJs(){if(PDFJS)return PDFJS;const base=`https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_V}/legacy/build/`;
  const L=await import(base+'pdf.min.mjs');L.GlobalWorkerOptions.workerSrc=base+'pdf.worker.min.mjs';return PDFJS=L}
 async function kitTermoVer(id){const t=(D.kt||[]).find(x=>String(x.id)===String(id));if(!t)return;const p=kP(t.pessoa_id),pdf=/pdf/i.test(t.tipo_arquivo||t.url);
  const m=document.createElement('div');m.className='mask';m.style.zIndex=12;let u=null;const fechar=()=>{m.remove();if(u)URL.revokeObjectURL(u)};m.addEventListener('click',e=>{if(e.target===m)fechar()});
@@ -1171,7 +1171,7 @@ async function kitTermoVer(id){const t=(D.kt||[]).find(x=>String(x.id)===String(
   catch(e){box.innerHTML=`<div style="padding:30px;text-align:center"><p><b>Não foi possível mostrar o Word aqui.</b></p><p class="m">${esc(e.message||e)}</p><button class="btn" onclick="kitTermoBaixar('${t.id}')">⬇ Baixar o termo</button></div>`}return}
  if(!pdf){const im=new Image();im.src=u||t.url;im.alt='Termo';im.style.cssText='max-width:100%;cursor:zoom-in;background:#fff';box.innerHTML='';box.appendChild(im);
   im.onclick=()=>{const z=im.style.maxWidth==='none';im.style.maxWidth=z?'100%':'none';im.style.cursor=z?'zoom-in':'zoom-out'};return}
- try{const L=await pdfjsLib(),doc=await L.getDocument(blob?{data:new Uint8Array(await blob.arrayBuffer())}:{url:t.url}).promise;
+ try{const L=await kPdfJs(),doc=await L.getDocument(blob?{data:new Uint8Array(await blob.arrayBuffer())}:{url:t.url}).promise;
   let zoom=1;const pages=[];for(let i=1;i<=doc.numPages;i++)pages.push(await doc.getPage(i));
   const desenha=async()=>{if(!m.isConnected)return;box.innerHTML='';const larg=Math.max(300,box.clientWidth-24),dpr=window.devicePixelRatio||1;m.querySelector('#tvp').textContent=Math.round(zoom*100)+'%';
    for(const pg of pages){const v0=pg.getViewport({scale:1}),sc=larg/v0.width*zoom,v=pg.getViewport({scale:sc*dpr}),cv=document.createElement('canvas');
@@ -1206,8 +1206,8 @@ const KMES={janeiro:1,fevereiro:2,marco:3,abril:4,maio:5,junho:6,julho:7,agosto:
 const kSemPat=t=>!t||/^(n|ñ|nao)\s*tem$|^-+$|^n\/?a$|^nao possui$|^sem$/i.test(kNorm(t).replace(/[.]/g,''));
 // dados do cabeçalho do termo (nº, nome, matrícula, data) a partir do texto corrido
 function kTermoCab(txt){const r={};let m=txt.match(/n\s*[°º.]\s*(\d+\s*\/\s*\d{4})/i);if(m)r.numero=m[1].replace(/\s/g,'');
- m=txt.match(/\beu,?\s+(.+?),\s*matr[ií]cula\s*(?:n\s*[°º.]?\s*)?:?\s*(\d+)/i);if(m){r.nome=m[1].trim();r.matricula=m[2]}
- m=kNorm(txt).match(/(\d{1,2})\s+de\s+([a-z]+)\s+de\s+(\d{4})/);if(m&&KMES[m[2]])r.data=`${m[3]}-${String(KMES[m[2]]).padStart(2,'0')}-${m[1].padStart(2,'0')}`;return r}
+ m=txt.match(/\beu,?\s+(.+?),\s*matr[ií]cula\s*(?:n\s*[°º.]?\s*)?:?\s*(\d+)/i);if(m){r.nome=m[1].split(/\beu,?\s+/i).pop().replace(/[^A-Za-zÀ-ú' .-]/g,' ').replace(/\s+/g,' ').trim();r.matricula=m[2]}
+ m=kNorm(txt).match(/(\d{1,2})\W*de\W+([a-z]+)\W+de\W+(\d{4})/);if(m&&KMES[m[2]]&&+m[1]>=1&&+m[1]<=31)r.data=`${m[3]}-${String(KMES[m[2]]).padStart(2,'0')}-${m[1].padStart(2,'0')}`;return r}
 function kTermoDeBlocos(bl){const r=kTermoCab(bl.filter(b=>b.p).map(b=>b.p).join(' '));r.itens=[];
  for(const b of bl){if(!b.tbl||!b.tbl.length)continue;const h=b.tbl[0].map(kNorm),ix=f=>h.findIndex(f);
   const iD=ix(c=>c.includes('descri')),iQ=ix(c=>c.startsWith('quant')||c.startsWith('qtd')||c==='qtde'),iP=ix(c=>c.includes('patrim')),iV=ix(c=>c.includes('unit')||c.includes('valor')||c.includes('r$'));
@@ -1217,7 +1217,7 @@ function kTermoDeBlocos(bl){const r=kTermoCab(bl.filter(b=>b.p).map(b=>b.p).join
    r.itens.push({descricao:de,quantidade:Math.max(1,parseInt(c(iQ))||1),patrimonio:kSemPat(c(iP))?null:c(iP),valor_unit:Number.isNaN(vv)?null:vv})}
   if(r.itens.length)break}
  return r}
-async function kPdfLinhas(buf){const L=await pdfjsLib(),doc=await L.getDocument({data:new Uint8Array(buf)}).promise,out=[];
+async function kPdfLinhas(buf){const L=await kPdfJs(),doc=await L.getDocument({data:new Uint8Array(buf.slice(0))}).promise,out=[];
  for(let i=1;i<=doc.numPages;i++){const tc=await (await doc.getPage(i)).getTextContent(),its=tc.items.filter(t=>t.str.trim()).sort((a,b)=>b.transform[5]-a.transform[5]),gr=[];
   // agrupa pedaços de texto que estão praticamente na mesma altura (tolerância de 6 pontos) numa mesma linha
   its.forEach(t=>{const y=t.transform[5],g=gr[gr.length-1];if(g&&Math.abs(g.y-y)<=6)g.t.push(t);else gr.push({y,t:[t]})});
@@ -1228,9 +1228,62 @@ function kTermoDePdf(lin){const r=kTermoCab(lin.join(' '));r.itens=[];
  lin.forEach(l=>{const t=l.match(/^total\b.*?R\$\s*([\d.]+,\d{2})/i);if(t){r.total=kNum(t[1]);return}const m=l.match(re);if(!m)return;
   r.itens.push({descricao:m[2].trim(),quantidade:Math.max(1,parseInt(m[4])||1),patrimonio:kSemPat(m[3])?null:m[3],valor_unit:kNum(m[5])})});
  return r}
-async function kLerTermo(f){const buf=await f.arrayBuffer();
+// ---------- Leitura de termo em FOTO / PDF escaneado (OCR com Tesseract.js) ----------
+let TESS=null;
+async function kTess(prog){if(!TESS){await new Promise((ok,er)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';sc.onload=ok;sc.onerror=()=>er(new Error('não foi possível carregar o leitor de fotos (verifique a internet)'));document.head.appendChild(sc)});TESS=window.Tesseract}
+ const w=await TESS.createWorker('por',1,{logger:m=>{if(m.status==='recognizing text'&&prog)prog(m.progress)}});
+ await w.setParameters({tessedit_pageseg_mode:'6',preserve_interword_spaces:'1'});return w}
+// melhora a imagem para a leitura: tons de cinza + contraste automático
+function kPrep(cv){const g=cv.getContext('2d',{willReadFrequently:true}),im=g.getImageData(0,0,cv.width,cv.height),d=im.data,h=new Array(256).fill(0),n=d.length/4;
+ for(let i=0;i<d.length;i+=4){const v=Math.round(.299*d[i]+.587*d[i+1]+.114*d[i+2]);d[i]=v;h[v]++}
+ let lo=0,hi=255,a=0;while(lo<255&&(a+=h[lo])<n*.02)lo++;a=0;while(hi>0&&(a+=h[hi])<n*.02)hi--;const k=hi>lo?255/(hi-lo):1;
+ for(let i=0;i<d.length;i+=4){const v=Math.max(0,Math.min(255,Math.round((d[i]-lo)*k)));d[i]=d[i+1]=d[i+2]=v}g.putImageData(im,0,0);return cv}
+async function kCanvasDeImagem(f){const bm=await createImageBitmap(f),sc=Math.min(2.5,Math.max(1,1900/bm.width)),cv=document.createElement('canvas');cv.width=Math.round(bm.width*sc);cv.height=Math.round(bm.height*sc);
+ const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,cv.width,cv.height);g.drawImage(bm,0,0,cv.width,cv.height);return kPrep(cv)}
+// pega a maior imagem (a foto) de dentro da página do PDF; se não der, desenha a página
+async function kImgPagina(pg,L){try{const ops=await pg.getOperatorList();let best=null;
+  for(let i=0;i<ops.fnArray.length;i++){const fn=ops.fnArray[i];if(fn!==L.OPS.paintImageXObject&&fn!==L.OPS.paintJpegXObject)continue;const nm=ops.argsArray[i][0],st=String(nm).startsWith('g_')?pg.commonObjs:pg.objs;
+   const o=await new Promise(ok=>{const t=setTimeout(()=>ok(null),5000);try{st.get(nm,v=>{clearTimeout(t);ok(v)})}catch(e){clearTimeout(t);ok(null)}});
+   if(o&&o.width&&o.height&&(!best||o.width*o.height>best.width*best.height))best=o}
+  if(!best||best.width<500)return null;
+  const c0=document.createElement('canvas');c0.width=best.width;c0.height=best.height;const g0=c0.getContext('2d');
+  if(best.bitmap)g0.drawImage(best.bitmap,0,0);else if(best.data){const id=g0.createImageData(best.width,best.height),src=best.data,n=best.width*best.height,k=src.length/n;
+   for(let j=0;j<n;j++){const s0=Math.floor(j*k);if(k>=3){id.data[j*4]=src[s0];id.data[j*4+1]=src[s0+1];id.data[j*4+2]=src[s0+2]}else{id.data[j*4]=id.data[j*4+1]=id.data[j*4+2]=src[s0]}id.data[j*4+3]=255}g0.putImageData(id,0,0)}else return null;
+  const sc=Math.min(2.5,Math.max(1,1900/c0.width)),cv=document.createElement('canvas');cv.width=Math.round(c0.width*sc);cv.height=Math.round(c0.height*sc);const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,cv.width,cv.height);g.drawImage(c0,0,0,cv.width,cv.height);return kPrep(cv)}
+ catch(e){return null}}
+async function kCanvasDePdf(buf){const L=await kPdfJs(),doc=await L.getDocument({data:new Uint8Array(buf.slice(0))}).promise,out=[];
+ for(let i=1;i<=Math.min(doc.numPages,4);i++){const pg=await doc.getPage(i),im=await kImgPagina(pg,L);if(im){out.push(im);continue}
+  const v0=pg.getViewport({scale:1}),v=pg.getViewport({scale:Math.min(5,1900/v0.width)}),cv=document.createElement('canvas');cv.width=Math.floor(v.width);cv.height=Math.floor(v.height);
+  const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,cv.width,cv.height);await pg.render({canvasContext:g,canvas:cv,viewport:v}).promise;out.push(kPrep(cv))}
+ return out}
+async function kOcr(canvases,prog){const w=await kTess(),txt=[];try{for(let i=0;i<canvases.length;i++){const r=await w.recognize(canvases[i],{},{text:true});txt.push(r.data.text);if(prog)prog((i+1)/canvases.length)}}finally{await w.terminate()}return txt.join('\n')}
+// interpreta o texto lido por OCR (foto/escaneado) de um termo com tabela Ordem | Descrição | Quant | R$ unit | R$ Total
+function kTermoDeOcr(txt){const lin=String(txt||'').split(/\r?\n/).map(l=>l.replace(/\s+/g,' ').trim()).filter(Boolean),r=kTermoCab(lin.join(' '));r.itens=[];r.ocr=true;
+ const dm=lin.join(' ').match(/\b(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{4})\b/);if(dm){const d=+dm[1],mo=+dm[2];const an=+dm[3];if(d>=1&&d<=31&&mo>=1&&mo<=12&&an>=2000&&an<=new Date().getFullYear())r.data=`${dm[3]}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
+ const MON=/R\s*\$\s*[\[|]?\s*(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})/gi,lixo=/^(?:[|\[\]{}()“”"'`´.,:;—–_-]+|[A-Z][a-z]?:?|[A-Z]{2}:?|[a-z]{1,2}:?)$/;
+ const limpa=s=>{let t=s.replace(/[|\[\]{}“”"]/g,' ').replace(/\s+/g,' ').trim().split(' ');
+  while(t.length&&lixo.test(t[t.length-1])&&!/^(de|da|do|e|em|a|o)$/.test(t[t.length-1]))t.pop();
+  while(t.length>1&&(lixo.test(t[0])&&!/^(de|da|do|a|o)$/.test(t[0])||/^\d{1,2}$/.test(t[0])&&/^[A-Za-zÀ-ú]/.test(t[1]||'')))t.shift();return t.join(' ')};
+ let ini=lin.findIndex(l=>/ordem|descri[cç]/i.test(l)&&/quant|unit|r\s*\$/i.test(l));if(ini<0)ini=lin.findIndex(l=>(l.match(MON)||[]).length);let cur=null;
+ for(let i=Math.max(0,ini);i<lin.length;i++){const l=lin[i];
+  if(/(^|\W)total\s*:?(\W|$)/i.test(l)&&!/r\s*\$\s*unit/i.test(l)){const v=[...l.matchAll(MON)].map(m=>kNum(m[1]));if(v.length)r.total=v[v.length-1];break}
+  const ms=[...l.matchAll(MON)];
+  if(!ms.length){if(cur&&!/ordem|descri/i.test(l)){const c=limpa(l);if(c)cur.descricao+=' '+c}continue}
+  let pre=l.slice(0,ms[0].index),qt=null;const qm=pre.match(/(?:^|\s)[\[|(]?\s*0?(\d{1,3})[\s|\[\]—–-]*$/);if(qm&&pre.replace(qm[0],'').trim()){qt=parseInt(qm[1]);pre=pre.slice(0,qm.index)}
+  const un=kNum(ms[0][1]),tot=ms.length>1?kNum(ms[ms.length-1][1]):null;
+  if(!(qt>0))qt=un>0&&tot>0&&Math.abs(tot/un-Math.round(tot/un))<0.01?Math.max(1,Math.round(tot/un)):1;
+  cur={descricao:limpa(pre),quantidade:qt,patrimonio:null,valor_unit:un>0?un:(tot>0?tot/qt:null)};r.itens.push(cur)}
+ r.itens=r.itens.filter(x=>x.descricao&&x.descricao.length>1).map(x=>{let d=x.descricao.replace(/\s+/g,' ').trim();const pm=d.match(/\bpatrim[oôó]nio\b\s*[:nº°.]*\s*([A-Z0-9][\w./-]*\d[\w./-]*)?/i);
+  if(pm){if(pm[1])x.patrimonio=pm[1];d=(d.slice(0,pm.index)+' '+d.slice(pm.index+pm[0].length)).replace(/\s+/g,' ').trim()}
+  x.descricao=d.charAt(0).toUpperCase()+d.slice(1);return x});
+ return r}
+async function kLerTermo(f,av){const buf=await f.arrayBuffer();
  if(kEhDocx(f))return kTermoDeBlocos(await kDocxBlocos(buf));
- if(kEhPdf(f)){const l=await kPdfLinhas(buf);if(!l.length)throw new Error('este PDF é uma imagem escaneada — não dá para ler o texto. Anexe o Word (.docx) ou o PDF gerado pelo Word.');return kTermoDePdf(l)}
+ const pOcr=p=>av&&av(`📷 Lendo a foto do termo… ${Math.round(p*100)}% <span class="m">(na primeira vez pode levar até 1 minuto)</span>`);
+ if(kEhPdf(f)){const l=await kPdfLinhas(buf),letras=l.join(' ').replace(/[^A-Za-zÀ-ú]/g,'').length;
+  if(letras>200){const r=kTermoDePdf(l);if(r.itens.length)return r;const r2=kTermoDeOcr(l.join('\n'));r2.ocr=false;return r2}
+  av&&av('📷 Este PDF é uma foto/escaneado. Preparando a leitura…');return kTermoDeOcr(await kOcr(await kCanvasDePdf(buf),pOcr))}
+ if(/^image\//.test(f.type)){av&&av('📷 Preparando a leitura da foto…');return kTermoDeOcr(await kOcr([await kCanvasDeImagem(f)],pOcr))}
  return null}
 const kAcharPessoa=n=>{const k=kNorm(n);if(!k)return null;return D.p.find(p=>kNorm(p.nome)===k)||D.p.find(p=>p.ativo&&(kNorm(p.nome).includes(k)||k.includes(kNorm(p.nome))))||null};
 
@@ -1239,7 +1292,7 @@ function kitTermoAnexar(pid){const p0=pid?kP(pid):null;if(pid&&!p0)return;if(D.k
  const pesSel=()=>{let h='',g=null;kPesOpts().forEach(o=>{if(o[2]!==g){if(g)h+='</optgroup>';g=o[2];if(g)h+=`<optgroup label="${esc(g)}">`}h+=`<option value="${esc(o[0])}">${esc(o[1])}</option>`});return h+(g?'</optgroup>':'')};
  m.innerHTML=`<div class="modal" style="max-width:860px"><h3>📎 ${p0?'Anexar termo de responsabilidade':'Importar termo de responsabilidade'}</h3>${p0?`<div class="m">${esc(p0.nome)} · ${esc(kFn(p0))}</div>`:''}
  <label>Arquivo do termo (Word .docx, PDF ou foto — obrigatório)</label><input type="file" id="ta1" accept=".docx,.pdf,image/*,application/pdf,${kDocxTipo}">
- <div class="m">Anexando o <b>Word (.docx)</b> ou o <b>PDF gerado pelo Word</b>, o sistema lê a tabela do termo e já prepara os itens com patrimônio, quantidade e valor.</div>
+ <div class="m">Anexando o <b>Word (.docx)</b>, o <b>PDF</b> (gerado pelo Word ou foto/escaneado) ou uma <b>foto</b> do termo, o sistema lê a tabela e já prepara os itens com patrimônio, quantidade e valor — você confere e corrige antes de anexar.</div>
  <div id="ta2" style="margin:8px 0"></div>
  ${p0?'':`<label>👷 Pessoa responsável</label><select id="tap"><option value="">— Selecionar pessoa —</option>${pesSel()}</select>`}
  <div id="tai"></div>
@@ -1247,35 +1300,54 @@ function kitTermoAnexar(pid){const p0=pid?kP(pid):null;if(pid&&!p0)return;if(D.k
  <label>Observação (opcional)</label><input id="ta4" placeholder="Ex.: termo atualizado após inclusão da roçadeira">
  <div class="err" id="ta5"></div><div class="acts" style="margin-top:14px"><button class="btn" id="ta6">📎 Anexar</button><button class="btn o" id="ta7">Cancelar</button></div></div>`;
  document.body.appendChild(m);const $m=s=>m.querySelector(s),pidAtual=()=>p0?p0.id:$m('#tap').value;m.querySelector('#ta7').onclick=()=>m.remove();
+ const somaL=()=>lido.itens.filter(x=>x.sel!==false).reduce((s,x)=>s+(x.valor_unit>0?x.valor_unit:0)*(x.quantidade>0?x.quantidade:0),0),somaT=()=>lido.itens.reduce((s,x)=>s+(x.valor_unit>0?x.valor_unit:0)*(x.quantidade>0?x.quantidade:0),0);
+ const somaHtml=()=>{const st=somaT(),dif=lido.total!=null&&Math.abs(st-lido.total)>0.009;return`<div style="font-weight:700">📋 Lido do termo${lido.numero?' nº '+esc(lido.numero):''}: ${lido.itens.length} ${lido.itens.length===1?'item':'itens'} · soma ${kBRL(st)}</div>`+(lido.total!=null?`<div class="m" style="color:${dif?'#b42318':'#1e7a3c'};font-weight:700">${dif?`⚠ A soma dos itens (${kBRL(st)}) é diferente do TOTAL do termo (${kBRL(lido.total)}). Confira: pode faltar um item ou algum valor foi lido errado.`:`✔ A soma dos itens confere com o TOTAL do termo (${kBRL(lido.total)}).`}</div>`:'')};
  const desenhaItens=()=>{const box=$m('#tai');if(!lido||!lido.itens.length){box.innerHTML='';return}
-  const pp=kP(pidAtual()),ex=new Set(pp?kIt(pp.id).map(x=>kNorm(x.descricao)+'|'+kNorm(x.patrimonio)):[]),jaT=new Set(pp&&lido.numero?(D.ki||[]).filter(x=>String(x.pessoa_id)===String(pp.id)&&kTermoNum(x.obs)===lido.numero.replace(/\s/g,'')).map(x=>kNorm(x.descricao)+'|'+kNorm(x.patrimonio)):[]),jaAnex=pp&&lido.numero?kTm(pp.id).find(t=>(kTermoNum(t.obs)||kTermoNum(t.arquivo))===lido.numero.replace(/\s/g,'')):null,soma=lido.itens.reduce((s,x)=>s+(x.valor_unit||0)*x.quantidade,0);
-  const dif=lido.total!=null&&Math.abs(soma-lido.total)>0.009,nomeOk=!lido.nome||!pp||kNorm(pp.nome)===kNorm(lido.nome),tp=kTipoDe(pp)||'';
+  const pp=kP(pidAtual()),ex=new Set(pp?kIt(pp.id).map(x=>kNorm(x.descricao)+'|'+kNorm(x.patrimonio)):[]),jaT=new Set(pp&&lido.numero?(D.ki||[]).filter(x=>String(x.pessoa_id)===String(pp.id)&&kTermoNum(x.obs)===lido.numero.replace(/\s/g,'')).map(x=>kNorm(x.descricao)+'|'+kNorm(x.patrimonio)):[]),jaAnex=pp&&lido.numero?kTm(pp.id).find(t=>(kTermoNum(t.obs)||kTermoNum(t.arquivo))===lido.numero.replace(/\s/g,'')):null;
+  const nomeOk=!lido.nome||!pp||kNorm(pp.nome)===kNorm(lido.nome),tp=$m('#tit')?.value||kTipoDe(pp)||'';
+  lido.itens.forEach(x=>{const kk=kNorm(x.descricao)+'|'+kNorm(x.patrimonio);x.jt=jaT.has(kk);x.dup=x.jt||ex.has(kk);if(x.sel===undefined)x.sel=!x.dup});
+  const inp=(i,f,v,st,ex2='')=>`<input class="tie" data-i="${i}" data-f="${f}" value="${esc(v??'')}" style="padding:6px;${st}" ${ex2}>`;
   box.innerHTML=`<div class="card" style="margin:10px 0;border-left:6px solid var(--g);padding:12px">
-  <div style="font-weight:700">📋 Lido do termo${lido.numero?' nº '+esc(lido.numero):''}: ${lido.itens.length} ${lido.itens.length===1?'item':'itens'} · ${kBRL(soma)}</div>
+  <div id="tisum">${somaHtml()}</div>
   <div class="m">${lido.nome?`Colaborador no termo: <strong>${esc(lido.nome)}</strong>${lido.matricula?' (matrícula '+esc(lido.matricula)+')':''}`:''}${lido.data?' · assinado em '+kDt(lido.data):''}</div>
-  ${lido.total!=null?`<div class="m" style="color:${dif?'#b42318':'#1e7a3c'};font-weight:700">${dif?`⚠ A soma dos itens (${kBRL(soma)}) é diferente do TOTAL do termo (${kBRL(lido.total)}). Confira os valores.`:`✔ A soma dos itens confere com o TOTAL do termo (${kBRL(lido.total)}).`}</div>`:''}
+  ${lido.ocr?`<div style="background:#fff4e5;color:#9a5b00;font-weight:700;border-radius:8px;padding:8px 10px;margin-top:6px">📷 Termo lido de uma FOTO. A leitura automática pode errar letras, números e a data (principalmente o que foi escrito à mão). Confira cada linha abaixo — dá para corrigir direto na tabela — e confira a <u>data da assinatura</u> antes de anexar.</div>`:''}
   ${jaAnex?`<div style="color:#9a5b00;font-weight:700;margin-top:4px">⚠ O Termo nº ${esc(lido.numero)} já foi anexado para esta pessoa em ${kDt(jaAnex.created_at)}. Os itens que já foram lançados dele vêm desmarcados para não duplicar.</div>`:''}${!nomeOk?`<div style="color:#b42318;font-weight:700;margin-top:4px">⚠ O nome no termo (${esc(lido.nome)}) é diferente da pessoa escolhida (${esc(pp.nome)}).</div>`:''}
   <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-weight:700"><input type="checkbox" id="tim" checked style="width:auto"> ➕ Adicionar ao kit os itens marcados abaixo</label>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0"><span class="m">Tipo de material dos itens:</span><select id="tit" style="width:auto">${[['','— Tipo —'],...KTIPOS].map(o=>`<option value="${esc(o[0])}" ${o[0]===tp?'selected':''}>${esc(o[1])}</option>`).join('')}</select>
   <button class="btn s o" id="tia">Marcar todos</button><button class="btn s o" id="tin">Desmarcar todos</button></div>
-  <div class="tw" style="max-height:300px;overflow:auto"><table><tr><th></th><th>Qtd</th><th>Item</th><th>Patrimônio</th><th style="text-align:right">R$ unit.</th><th style="text-align:right">Total</th></tr>
-  ${lido.itens.map((x,i)=>{const kk=kNorm(x.descricao)+'|'+kNorm(x.patrimonio),jt=jaT.has(kk),dup=jt||ex.has(kk);return`<tr style="${dup?'opacity:.55':''}"><td><input type="checkbox" class="tic" data-i="${i}" ${dup?'':'checked'} style="width:auto"></td><td>${x.quantidade}</td><td>${esc(x.descricao)}${jt?' <span class="pill">já lançado deste termo</span>':dup?' <span class="pill">já está no kit</span>':''}</td><td>${x.patrimonio?esc(x.patrimonio):'Não'}</td><td style="text-align:right;white-space:nowrap">${x.valor_unit!=null?kBRL(x.valor_unit):'—'}</td><td style="text-align:right;white-space:nowrap">${x.valor_unit!=null?kBRL(x.valor_unit*x.quantidade):'—'}</td></tr>`}).join('')}</table></div></div>`;
-  $m('#tia').onclick=()=>m.querySelectorAll('.tic').forEach(c=>c.checked=true);$m('#tin').onclick=()=>m.querySelectorAll('.tic').forEach(c=>c.checked=false);
-  $m('#tim').onchange=e=>m.querySelectorAll('.tic,#tit').forEach(c=>c.disabled=!e.target.checked)};
+  <div class="m" style="margin-bottom:4px">✏️ Você pode corrigir qualquer campo da tabela antes de anexar.</div>
+  <div class="tw" style="max-height:360px;overflow:auto"><table><tr><th></th><th>Qtd</th><th>Item</th><th>Patrimônio</th><th style="text-align:right">R$ unit.</th><th style="text-align:right">Total</th><th></th></tr>
+  ${lido.itens.map((x,i)=>`<tr style="${x.dup?'opacity:.6':''}"><td><input type="checkbox" class="tic" data-i="${i}" ${x.sel?'checked':''} style="width:auto"></td>
+   <td>${inp(i,'quantidade',x.quantidade,'width:58px','type="number" min="1"')}</td>
+   <td>${inp(i,'descricao',x.descricao,'min-width:220px;width:100%')}${x.jt?' <span class="pill">já lançado deste termo</span>':x.dup?' <span class="pill">já está no kit</span>':''}</td>
+   <td>${inp(i,'patrimonio',x.patrimonio,'width:105px','placeholder="Não tem"')}</td>
+   <td>${inp(i,'valor_unit',x.valor_unit!=null&&!Number.isNaN(x.valor_unit)?Number(x.valor_unit).toFixed(2).replace('.',','):'','width:92px;text-align:right','inputmode="decimal" placeholder="0,00"')}</td>
+   <td class="titot" data-i="${i}" style="text-align:right;white-space:nowrap">${x.valor_unit>0?kBRL(x.valor_unit*(x.quantidade||1)):'—'}</td>
+   <td><button class="btn s o tidel" data-i="${i}" title="Remover esta linha (não é um item)" style="color:#c0392b;border-color:#c0392b">✕</button></td></tr>`).join('')}</table></div>
+  <button class="btn s o" id="tiadd" style="margin-top:6px">+ Adicionar uma linha que faltou</button></div>`;
+  $m('#tia').onclick=()=>{lido.itens.forEach(x=>x.sel=true);m.querySelectorAll('.tic').forEach(c=>c.checked=true)};$m('#tin').onclick=()=>{lido.itens.forEach(x=>x.sel=false);m.querySelectorAll('.tic').forEach(c=>c.checked=false)};
+  $m('#tim').onchange=e=>m.querySelectorAll('.tic,#tit,.tie,.tidel,#tiadd').forEach(c=>c.disabled=!e.target.checked);
+  m.querySelectorAll('.tic').forEach(c=>c.onchange=()=>{lido.itens[+c.dataset.i].sel=c.checked});
+  m.querySelectorAll('.tidel').forEach(b=>b.onclick=()=>{lido.itens.splice(+b.dataset.i,1);desenhaItens()});
+  $m('#tiadd').onclick=()=>{lido.itens.push({descricao:'',quantidade:1,patrimonio:null,valor_unit:null,sel:true});desenhaItens();const l=[...m.querySelectorAll('.tie[data-f=descricao]')].pop();l&&l.focus()};
+  m.querySelectorAll('.tie').forEach(el=>el.oninput=()=>{const x=lido.itens[+el.dataset.i],f=el.dataset.f,v=el.value.trim();
+   if(f==='quantidade')x.quantidade=Math.max(1,parseInt(v)||1);else if(f==='valor_unit')x.valor_unit=kNum(v);else if(f==='patrimonio')x.patrimonio=kSemPat(v)?null:v;else x.descricao=v;
+   const t=m.querySelector(`.titot[data-i="${el.dataset.i}"]`);if(t)t.textContent=x.valor_unit>0?kBRL(x.valor_unit*(x.quantidade||1)):'—';$m('#tisum').innerHTML=somaHtml()})};
  if($m('#tap'))$m('#tap').onchange=desenhaItens;
  $m('#ta1').onchange=async e=>{const f=e.target.files[0],pv=$m('#ta2');lido=null;$m('#tai').innerHTML='';if(!f){pv.innerHTML='';return}
   pv.innerHTML=/^image\//.test(f.type)?`<img src="${URL.createObjectURL(f)}" style="max-width:100%;max-height:220px;border-radius:8px">`:`${kEhDocx(f)?'📝':'📄'} ${esc(f.name)} (${(f.size/1048576).toFixed(1)} MB)`;
-  if(!kEhDocx(f)&&!kEhPdf(f))return;pv.insertAdjacentHTML('beforeend','<div class="m">Lendo o termo…</div>');
-  try{lido=await kLerTermo(f);pv.lastElementChild.remove();
-   if(!lido||!lido.itens.length){pv.insertAdjacentHTML('beforeend','<div class="m" style="color:#9a5b00">Não encontrei a tabela de itens neste arquivo. Ele será só anexado; os itens podem ser incluídos em “+ Adicionar itens”.</div>');return}
+  if(!kEhDocx(f)&&!kEhPdf(f)&&!/^image\//.test(f.type))return;pv.insertAdjacentHTML('beforeend','<div class="m" id="tapr">Lendo o termo…</div>');$m('#ta6').disabled=true;
+  try{lido=await kLerTermo(f,h=>{const x=$m('#tapr');if(x)x.innerHTML=h});$m('#tapr')?.remove();$m('#ta6').disabled=false;
+   if(!lido||!lido.itens.length){pv.insertAdjacentHTML('beforeend','<div class="m" style="color:#9a5b00">Não encontrei a tabela de itens neste arquivo. Ele será só anexado; os itens podem ser incluídos em “+ Adicionar itens”'+(lido&&lido.ocr?' (dica: uma foto mais reta, nítida e bem iluminada melhora a leitura)':'')+'.</div>');return}
    if(lido.data)$m('#ta3').value=lido.data;if(lido.numero&&!$m('#ta4').value)$m('#ta4').value='Termo nº '+lido.numero;
    if(!p0&&lido.nome){const ac=kAcharPessoa(lido.nome);if(ac)$m('#tap').value=ac.id}
    desenhaItens()}
-  catch(x){pv.lastElementChild?.remove();pv.insertAdjacentHTML('beforeend',`<div class="m" style="color:#9a5b00">Não foi possível ler os itens: ${esc(x.message||x)}. O arquivo pode ser anexado mesmo assim.</div>`)}};
+  catch(x){$m('#tapr')?.remove();$m('#ta6').disabled=false;pv.insertAdjacentHTML('beforeend',`<div class="m" style="color:#9a5b00">Não foi possível ler os itens: ${esc(x.message||x)}. O arquivo pode ser anexado mesmo assim.</div>`)}};
  $m('#ta6').onclick=async e=>{const b=e.target,er=$m('#ta5'),f=$m('#ta1').files[0];er.textContent='';
   const p=kP(pidAtual());if(!p)return er.textContent='Escolha a pessoa responsável pelo termo.';
   if(!f)return er.textContent='Escolha o arquivo do termo.';if(!kEhDocx(f)&&!kEhPdf(f)&&!/^image\//.test(f.type))return er.textContent='Envie um Word (.docx), PDF ou foto.';if(f.size>15*1048576)return er.textContent='Arquivo muito grande (máx. 15 MB).';
-  const imp=lido&&lido.itens.length&&$m('#tim')?.checked,sel=imp?[...m.querySelectorAll('.tic')].filter(c=>c.checked).map(c=>lido.itens[+c.dataset.i]):[],tipo=$m('#tit')?.value||'';
+  const imp=lido&&lido.itens.length&&$m('#tim')?.checked,sel=imp?lido.itens.filter(x=>x.sel):[],tipo=$m('#tit')?.value||'';
+  for(const x of sel){if(!x.descricao)return er.textContent='Há uma linha marcada sem o nome do item. Preencha ou remova (✕).';if(Number.isNaN(x.valor_unit))return er.textContent=`Valor inválido em "${x.descricao}". Use, por exemplo, 150,00.`}
   if(imp&&sel.length&&!tipo)return er.textContent='Escolha o tipo de material dos itens.';
   const dv=$m('#ta3').value,ob=$m('#ta4').value.trim();b.disabled=true;er.textContent='Enviando…';
   try{const ct=kEhDocx(f)?kDocxTipo:kEhPdf(f)?'application/pdf':f.type,ext=(f.name.match(/\.[a-z0-9]+$/i)||[kEhDocx(f)?'.docx':kEhPdf(f)?'.pdf':'.jpg'])[0].toLowerCase(),pa=`kits/termos/${p.id}/${Date.now()}${ext}`;
@@ -1305,7 +1377,7 @@ function kitRel(tipo){const ps=kLista();if(!ps.length)return toast('Nenhuma pess
 // ---------- Telas ----------
 function render(){
  const tabs=[['painel','🧰 Ferramentas'],['hist','🕘 Movimentações'],['locais','📍 Locais'],['pessoas','👷 Pessoas'],['kits','🎒 Kits pessoais'+((()=>{const n=(D.p||[]).filter(p=>kDiv(p.id)).length;return n?' <span class="pill u" title="Kits com divergência na última conferência">'+n+'</span>':''})())],['funcoes','🏷️ Funções'],['edic','✏️ Edições']];{const nr=rcPend().length+rcRec().length;tabs.push(['recol','🚚 Recolhimentos'+(nr?' <span class="pill u">'+nr+'</span>':'')]);const na=aprPend().length;tabs.push(['aprov','🔀 Aprovações'+(na?' <span class="pill u">'+na+'</span>':'')])}if(me.papel==='principal')tabs.push(['acessos','🔑 Acessos']);
- $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas <span style="font-size:11px;font-weight:400;opacity:.75">versão 13/11 14h55</span></h1><small>${esc(me.nome)} (${meCargo()||(me.papel==='principal'?'principal':'correlato')})</small><button class="btn o s" onclick="sair()">Sair</button></header>
+ $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas <span style="font-size:11px;font-weight:400;opacity:.75">versão 17/11 11h30</span></h1><small>${esc(me.nome)} (${meCargo()||(me.papel==='principal'?'principal':'correlato')})</small><button class="btn o s" onclick="sair()">Sair</button></header>
  <nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';q='';render()">${t[1]}</button>`).join('')}</nav><main>${{painel,hist:histView,locais,pessoas,kits,funcoes,edic,acessos,recol:recolHtml,aprov:aprovView}[tab]()}</main>`;
  const s=$('#q');if(s){s.oninput=e=>{if(!e.inputType){e.target.value=q;return}q=e.target.value;const p=e.target.selectionStart;render();const n=$('#q');n.focus();n.setSelectionRange(p,p)}}
  if(kReabre){const k=kReabre;kReabre=null;kitVer(k)}}
