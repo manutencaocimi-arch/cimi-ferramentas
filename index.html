@@ -979,7 +979,7 @@ function kits(){
  <div class="cards">${cards}</div>
  <div class="m" style="margin:-4px 0 10px">Mostrando <b style="display:inline;font-size:inherit">${r.length}</b> pessoa(s). Na busca você também pode digitar o nome de uma ferramenta para saber com quem ela está.</div>
  <div class="bar"><input id="q" name="busca_cimi" autocomplete="off" data-lpignore="true" placeholder="🔎 Buscar pessoa, função ou ferramenta do kit (ex.: roçadeira)..." value="${esc(q)}">
- <button class="btn" onclick="kitAdd()">+ Adicionar itens a um kit</button><button class="btn o" title="Anexe o termo (Word ou PDF): o sistema identifica a pessoa e inclui os itens com patrimônio e valor" onclick="kitTermoAnexar()">📄 Importar termo</button><button class="btn y" onclick="kitRel('print')">🖨️ Imprimir</button><button class="btn" onclick="kitRel('pdf')">📄 PDF</button><button class="btn o" onclick="kitRel('xlsx')">📊 Excel</button></div>
+ <button class="btn" onclick="kitAdd()">+ Adicionar itens a um kit</button><button class="btn o" title="Anexe o termo (Word ou PDF): o sistema identifica a pessoa e inclui os itens com patrimônio e valor" onclick="kitTermoAnexar()">📄 Importar termo</button><button class="btn o" title="Selecione vários arquivos de termo de uma vez: o sistema separa e inclui cada um no kit da pessoa certa" onclick="kitTermoLote()">📚 Importar vários termos</button><button class="btn y" onclick="kitRel('print')">🖨️ Imprimir</button><button class="btn" onclick="kitRel('pdf')">📄 PDF</button><button class="btn o" onclick="kitRel('xlsx')">📊 Excel</button></div>
  <div class="lg">${r.map(tile).join('')||'<p class="m">Nenhuma pessoa encontrada.</p>'}</div>`}
 
 function kitVer(pid){const p=kP(pid);if(!p)return;const it=kIt(pid),en=kEnc(pid),cf=kCf(pid),u=cf[0],c=fcor(p.funcao_id),fn=kFn(p);
@@ -1315,6 +1315,68 @@ async function kLerTermo(f,av){const buf=await f.arrayBuffer();
  return null}
 const kAcharPessoa=n=>{const k=kNorm(n);if(!k)return null;return D.p.find(p=>kNorm(p.nome)===k)||D.p.find(p=>p.ativo&&(kNorm(p.nome).includes(k)||k.includes(kNorm(p.nome))))||null};
 
+// ---------- Importar VÁRIOS termos de uma vez (cada arquivo = um termo; o sistema identifica a pessoa) ----------
+function kitTermoLote(){if(D.ktErr)return toast('Rode o arquivo kits_termos.sql no Supabase para ativar os anexos.');
+ const m=document.createElement('div');m.className='mask';let L=[],rodando=false;
+ const pesSel=v=>{let h='<option value="">— Escolher pessoa —</option>',g=null;kPesOpts().slice(1).forEach(o=>{if(o[2]!==g){if(g)h+='</optgroup>';g=o[2];h+=`<optgroup label="${esc(g)}">`}h+=`<option value="${esc(o[0])}" ${String(o[0])===String(v)?'selected':''}>${esc(o[1])}</option>`});return h+(g?'</optgroup>':'')};
+ m.innerHTML=`<div class="modal" style="max-width:1150px"><h3>📚 Importar vários termos de uma vez</h3>
+ <div class="m">Selecione vários arquivos de termo (<b>Word .docx</b> ou <b>PDF gerado pelo Word</b>) — pode ser a pasta inteira (Ctrl+A). Cada arquivo é um termo: o sistema identifica a <b>pessoa pelo nome</b>, o <b>nº e a data</b> e os <b>itens com valores</b>. Você confere a tabela e depois importa tudo.</div>
+ <input type="file" id="lt1" multiple accept=".docx,.pdf,application/pdf,${kDocxTipo}" style="margin:10px 0">
+ <div id="lt2" class="m" style="font-weight:700"></div><div id="lt3"></div><div class="err" id="lt4"></div>
+ <div class="acts" style="margin-top:12px"><button class="btn" id="lt5" disabled>📥 Importar os termos marcados</button><button class="btn o" id="lt6">Fechar</button></div></div>`;
+ document.body.appendChild(m);const $m=q=>m.querySelector(q),fecha=()=>{if(rodando&&!confirm('A importação ainda está em andamento. Fechar mesmo assim?'))return;m.remove();if(L.some(r=>r.feito)){load().then(render)}};$m('#lt6').onclick=fecha;
+ const chave=r=>`${r.pid}|${r.lido?.numero||''}|${r.data||''}`;
+ const situacao=r=>{if(r.erro)return['erro',r.erro];if(!r.lido||!r.lido.itens.length)return['aviso','Tabela de itens não encontrada — use a importação individual'];if(!r.pid)return['aviso','Pessoa não encontrada — escolha na lista'];
+  const pp=kP(r.pid),num=(r.lido.numero||'').replace(/\s/g,'');
+  if(num&&kTm(r.pid).some(t=>(kTermoNum(t.obs)||kTermoNum(t.arquivo))===num&&(!r.data||!t.data_termo||t.data_termo===r.data)))return['ja','Este termo já foi importado para '+pp.nome];
+  if(L.some(o=>o!==r&&o.marc&&o.i<r.i&&chave(o)===chave(r)))return['ja','Arquivo repetido neste lote'];
+  const nomeOk=!r.lido.nome||kNorm(pp.nome)===kNorm(r.lido.nome)||kNorm(pp.nome).includes(kNorm(r.lido.nome))||kNorm(r.lido.nome).includes(kNorm(pp.nome));
+  return nomeOk?['ok','Pronto para importar']:['aviso',`Nome no termo (${r.lido.nome}) diferente da pessoa escolhida — confira`]};
+ const desenha=()=>{const box=$m('#lt3');if(!L.length){box.innerHTML='';return}
+  L.forEach(r=>{const[s]=situacao(r);if(r.marc===undefined)r.marc=s==='ok'});
+  const cor={ok:'#1e7a3c',aviso:'#9a5b00',ja:'#6b7280',erro:'#b42318',feito:'#1e7a3c'};
+  box.innerHTML=`<div class="tw" style="max-height:52vh;overflow:auto;margin-top:8px"><table><tr><th><input type="checkbox" id="ltall" style="width:auto" title="Marcar todos os prontos"></th><th>Arquivo</th><th>Pessoa</th><th>Termo nº</th><th>Data</th><th style="text-align:right">Itens</th><th style="text-align:right">Valor</th><th>Situação</th></tr>
+  ${L.map(r=>{const[s,txt]=r.feito?['feito',r.feito]:situacao(r),soma=r.lido?r.lido.itens.reduce((a,x)=>a+(x.valor_unit||0)*x.quantidade,0):0,dif=r.lido&&r.lido.total!=null&&Math.abs(soma-r.lido.total)>0.009;
+   return`<tr style="${s==='ja'||s==='erro'?'opacity:.6':''}"><td>${r.feito?'✔':`<input type="checkbox" class="ltc" data-i="${r.i}" ${r.marc?'checked':''} ${!r.lido||!r.lido.itens.length||r.erro?'disabled':''} style="width:auto">`}</td>
+   <td style="max-width:260px;word-break:break-word">${kEhDocx(r.f)?'📝':'📄'} ${esc(r.f.name)}</td>
+   <td>${r.feito?esc(kP(r.pid)?.nome||''):`<select class="ltp" data-i="${r.i}" style="width:200px;padding:6px" ${!r.lido||r.erro?'disabled':''}>${pesSel(r.pid)}</select>`}${r.lido?.nome?`<div class="m" style="font-size:11px">No termo: ${esc(r.lido.nome)}</div>`:''}</td>
+   <td>${esc(r.lido?.numero||'—')}</td>
+   <td>${r.feito?kDt(r.data):`<input type="date" class="ltd" data-i="${r.i}" value="${esc(r.data||'')}" style="width:140px;padding:6px" ${!r.lido||r.erro?'disabled':''}>`}</td>
+   <td style="text-align:right">${r.lido?r.lido.itens.length:'—'}</td>
+   <td style="text-align:right;white-space:nowrap">${r.lido?kBRL(soma):'—'}${dif?`<div style="color:#b42318;font-size:11px;font-weight:700">⚠ total do termo ${kBRL(r.lido.total)}</div>`:''}</td>
+   <td style="color:${cor[s]};font-weight:700;font-size:12px;max-width:230px">${s==='ok'?'✔ ':s==='feito'?'✅ ':s==='ja'?'↷ ':'⚠ '}${esc(txt)}</td></tr>`}).join('')}</table></div>`;
+  const marcados=L.filter(r=>r.marc&&!r.feito&&situacao(r)[0]!=='ja'&&situacao(r)[0]!=='erro'&&r.pid&&r.lido?.itens.length);
+  $m('#lt5').disabled=rodando||!marcados.length;$m('#lt5').textContent=`📥 Importar ${marcados.length} ${marcados.length===1?'termo marcado':'termos marcados'} (${marcados.reduce((a,r)=>a+r.lido.itens.length,0)} itens)`;
+  m.querySelectorAll('.ltc').forEach(c=>c.onchange=()=>{L[+c.dataset.i].marc=c.checked;desenha()});
+  m.querySelectorAll('.ltp').forEach(c=>c.onchange=()=>{const r=L[+c.dataset.i];r.pid=c.value;r.marc=situacao(r)[0]==='ok';desenha()});
+  m.querySelectorAll('.ltd').forEach(c=>c.onchange=()=>{const r=L[+c.dataset.i];r.data=c.value;r.marc=situacao(r)[0]==='ok'||r.marc;desenha()});
+  const all=$m('#ltall');if(all)all.onchange=()=>{L.forEach(r=>{if(!r.feito&&situacao(r)[0]==='ok')r.marc=all.checked});desenha()}};
+ $m('#lt1').onchange=async e=>{const fs=[...e.target.files].filter(f=>kEhDocx(f)||kEhPdf(f));if(!fs.length)return;L=[];$m('#lt3').innerHTML='';$m('#lt5').disabled=true;rodando=true;
+  for(let i=0;i<fs.length;i++){const f=fs[i],r={i,f};$m('#lt2').textContent=`Lendo ${i+1} de ${fs.length}: ${f.name}…`;
+   try{const buf=await f.arrayBuffer();if(kEhDocx(f))r.lido=kTermoDeBlocos(await kDocxBlocos(buf));else{const l=await kPdfLinhas(buf);if(l.join(' ').replace(/[^A-Za-zÀ-ú]/g,'').length<200)throw new Error('PDF escaneado/foto — use a importação individual');r.lido=kTermoDePdf(l);if(!r.lido.itens.length){r.lido=kTermoDeOcr(l.join('\n'));r.lido.ocr=false}}
+    r.data=r.lido.data||'';const ac=r.lido.nome?kAcharPessoa(r.lido.nome):null;r.pid=ac?String(ac.id):''}
+   catch(x){r.erro=x.message||String(x)}
+   L.push(r);if(i%3===2||i===fs.length-1)desenha()}
+  rodando=false;const ok=L.filter(r=>situacao(r)[0]==='ok').length;$m('#lt2').innerHTML=`${L.length} arquivo(s) lido(s) · <span style="color:#1e7a3c">${ok} pronto(s) para importar</span>${L.length-ok?` · <span style="color:#9a5b00">${L.length-ok} para conferir ou já importado(s)</span>`:''}`;desenha()};
+ $m('#lt5').onclick=async()=>{const fila=L.filter(r=>r.marc&&!r.feito&&r.pid&&r.lido?.itens.length&&!['ja','erro'].includes(situacao(r)[0]));if(!fila.length)return;
+  if(!confirm(`Importar ${fila.length} termo(s) agora?`))return;rodando=true;$m('#lt5').disabled=true;const er=$m('#lt4');er.textContent='';let okN=0,itN=0;
+  for(let k=0;k<fila.length;k++){const r=fila[k],p=kP(r.pid),f=r.f,lido=r.lido;$m('#lt2').textContent=`Importando ${k+1} de ${fila.length}: ${f.name}…`;
+   try{const ct=kEhDocx(f)?kDocxTipo:'application/pdf',ext=kEhDocx(f)?'.docx':'.pdf',pa=`kits/termos/${p.id}/${Date.now()}_${k}${ext}`;
+    const {error:ue}=await sb.storage.from('fotos').upload(pa,f,{contentType:ct});if(ue)throw new Error(ue.message);
+    const url=sb.storage.from('fotos').getPublicUrl(pa).data.publicUrl,num=(lido.numero||'').replace(/\s/g,'');
+    let q=await sb.from('kit_termos').insert({pessoa_id:p.id,url,arquivo:f.name,tipo_arquivo:ct,data_termo:r.data||null,obs:num?'Termo nº '+num:null,usuario_id:me.id,usuario_nome:me.nome});if(q.error)throw q.error;
+    (D.kt=D.kt||[]).push({pessoa_id:p.id,arquivo:f.name,data_termo:r.data||null,obs:num?'Termo nº '+num:null,created_at:new Date().toISOString()});
+    const ja=new Set((D.ki||[]).filter(x=>String(x.pessoa_id)===String(p.id)&&num&&kTermoNum(x.obs)===num).map(x=>kNorm(x.descricao)+'|'+kNorm(x.patrimonio)));
+    const its=lido.itens.filter(x=>x.descricao&&!ja.has(kNorm(x.descricao)+'|'+kNorm(x.patrimonio))),dt=r.data?new Date(r.data+'T12:00:00').toISOString():new Date().toISOString(),tipo=kTipoDe(p)||null;
+    if(its.length){q=await sb.from('kit_itens').insert(its.map(x=>({pessoa_id:p.id,descricao:x.descricao,quantidade:x.quantidade,tipo,tem_patrimonio:!!x.patrimonio,patrimonio:x.patrimonio,valor_unit:Number.isNaN(x.valor_unit)?null:x.valor_unit,estado:'bom',obs:'Importado do termo'+(num?' nº '+num:''),status:'com_pessoa',entregue_em:dt,entregue_por:me.nome,usuario_id:me.id,usuario_nome:me.nome})));if(q.error)throw new Error('termo anexado, mas os itens não entraram: '+q.error.message)}
+    if(lido.matricula&&!p.matricula){try{const rm=await sb.rpc('kit_salvar_matricula',{p_pessoa:String(p.id),p_matricula:lido.matricula});if(!rm.error)p.matricula=lido.matricula}catch(_){}}
+    await logEdit('kits',p.nome+' — termo de responsabilidade',[['termo anexado (lote)','',f.name+` (+${its.length} itens no kit)`]]);
+    r.feito=`Importado: ${its.length} ${its.length===1?'item':'itens'} no kit de ${p.nome}`;okN++;itN+=its.length}
+   catch(x){r.erro='Erro: '+(x.message||x)}
+   desenha()}
+  rodando=false;$m('#lt2').innerHTML=`<span style="color:#1e7a3c">✅ ${okN} termo(s) importado(s) · ${itN} item(ns) incluído(s) nos kits.</span>${fila.length-okN?` <span style="color:#b42318">${fila.length-okN} com erro (veja a coluna Situação).</span>`:''}`;
+  toast(`${okN} termo(s) importado(s) ✔`);await load();render();desenha()}}
+
 function kitTermoAnexar(pid){const p0=pid?kP(pid):null;if(pid&&!p0)return;if(D.ktErr)return toast('Rode o arquivo kits_termos.sql no Supabase para ativar os anexos.');
  const m=document.createElement('div');m.className='mask';let lido=null;
  const pesSel=()=>{let h='',g=null;kPesOpts().forEach(o=>{if(o[2]!==g){if(g)h+='</optgroup>';g=o[2];if(g)h+=`<optgroup label="${esc(g)}">`}h+=`<option value="${esc(o[0])}">${esc(o[1])}</option>`});return h+(g?'</optgroup>':'')};
@@ -1551,7 +1613,7 @@ function kitRel(tipo){const ps=kLista();if(!ps.length)return toast('Nenhuma pess
 // ---------- Telas ----------
 function render(){
  const tabs=[['painel','🧰 Ferramentas'],['hist','🕘 Movimentações'],['locais','📍 Locais'],['pessoas','👷 Pessoas'],['kits','🎒 Kits pessoais'+((()=>{const n=(D.p||[]).filter(p=>kDiv(p.id)).length;return n?' <span class="pill u" title="Kits com divergência na última conferência">'+n+'</span>':''})())],['funcoes','🏷️ Funções'],['edic','✏️ Edições']];{const nr=rcPend().length+rcRec().length;tabs.push(['recol','🚚 Recolhimentos'+(nr?' <span class="pill u">'+nr+'</span>':'')]);const na=aprPend().length;tabs.push(['aprov','🔀 Aprovações'+(na?' <span class="pill u">'+na+'</span>':'')])}if(me.papel==='principal')tabs.push(['acessos','🔑 Acessos']);
- $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas <span style="font-size:11px;font-weight:400;opacity:.75">versão 20/11 10h30</span></h1><small>${esc(me.nome)} (${meCargo()||(me.papel==='principal'?'principal':'correlato')})</small><button class="btn o s" onclick="sair()">Sair</button></header>
+ $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas <span style="font-size:11px;font-weight:400;opacity:.75">versão 20/11 12h10</span></h1><small>${esc(me.nome)} (${meCargo()||(me.papel==='principal'?'principal':'correlato')})</small><button class="btn o s" onclick="sair()">Sair</button></header>
  <nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';q='';render()">${t[1]}</button>`).join('')}</nav><main>${{painel,hist:histView,locais,pessoas,kits,funcoes,edic,acessos,recol:recolHtml,aprov:aprovView}[tab]()}</main>`;
  const s=$('#q');if(s){s.oninput=e=>{if(!e.inputType){e.target.value=q;return}q=e.target.value;const p=e.target.selectionStart;render();const n=$('#q');n.focus();n.setSelectionRange(p,p)}}
  if(kReabre){const k=kReabre;kReabre=null;kitVer(k);if(kExtPend&&String(kExtPend.pid)===String(k)){const e=kExtPend;kExtPend=null;kitExtravioGerar(e.pid,e.ids)}}}
