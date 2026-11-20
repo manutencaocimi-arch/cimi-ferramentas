@@ -1170,10 +1170,14 @@ async function kitTermoVer(id){const t0=(D.kt||[]).find(x=>String(x.id)===String
  const m=document.createElement('div');m.className='mask';m.style.zIndex=12;const fechar=()=>{m.remove();urls.forEach(u=>URL.revokeObjectURL(u))};m.addEventListener('click',e=>{if(e.target===m)fechar()});
  m.innerHTML=`<div class="modal" style="max-width:1000px;height:92vh;display:flex;flex-direction:column"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><h3 style="margin:0;flex:1">📎 Termo de responsabilidade — ${esc(p?.nome||'')}</h3>
  <span id="tvz" style="display:none;gap:4px;align-items:center"><button class="btn s o" id="tvm" title="Diminuir">−</button><span class="m" id="tvp" style="min-width:44px;text-align:center">100%</span><button class="btn s o" id="tvM" title="Aumentar">+</button></span>
- <button class="btn s o" id="tv2">⬇ Baixar${arqs.length>1?' ('+arqs.length+' arquivos)':''}</button><button class="btn s" id="tv3">Fechar</button></div>
+ <button class="btn s o" id="tv2">⬇ Baixar${arqs.length>1?' ('+arqs.length+' arquivos)':''}</button>${me.papel==='principal'?`<button class="btn s o" id="tv5" title="Trocar o arquivo deste termo (os itens do kit não mudam)">✏️ Alterar</button><button class="btn s o" id="tv6" style="color:#c0392b;border-color:#c0392b" title="Excluir este termo para incluir novamente">🗑 Excluir</button>`:''}<button class="btn s" id="tv3">Fechar</button></div>
  <div class="m" style="margin-bottom:8px">${arqs.length>1?`${arqs.length} páginas · `:esc(kTmNome(t0))+' · '}assinado em ${kDt(t0.data_termo)} · anexado por ${esc(t0.usuario_nome||'—')}</div>
  <div id="tv4" style="flex:1;min-height:0;border:1px solid var(--b);border-radius:8px;overflow:auto;background:#e9edeb;padding:10px;text-align:center"><span class="m">Carregando o termo…</span></div></div>`;
- document.body.appendChild(m);m.querySelector('#tv3').onclick=fechar;m.querySelector('#tv2').onclick=()=>arqs.forEach((a,i)=>setTimeout(()=>kitTermoBaixar(a.id),i*700));
+ document.body.appendChild(m);m.querySelector('#tv3').onclick=fechar;
+ const gk=(()=>{const n=kGrupos(t0.pessoa_id).tk(t0);return n||'arq:'+t0.id})();
+ if(m.querySelector('#tv5'))m.querySelector('#tv5').onclick=()=>{fechar();kitTermoArquivo(t0.pessoa_id,gk,'alterar',kTmAss(t0)?'ass':'orig')};
+ if(m.querySelector('#tv6'))m.querySelector('#tv6').onclick=()=>{fechar();if(kTmAss(t0))kitTermoExcluirAss(t0.id);else kitTermoExcluirGrupo(t0.pessoa_id,gk)};
+ m.querySelector('#tv2').onclick=()=>arqs.forEach((a,i)=>setTimeout(()=>kitTermoBaixar(a.id),i*700));
  const box=m.querySelector('#tv4'),fontes=[];let zoom=1;
  for(const t of arqs){const f={t,tipo:kEhDocx(t)?'docx':/pdf/i.test(t.tipo_arquivo||t.url)?'pdf':'img'};
   try{const bl=await kTmBlob(t);f.url=URL.createObjectURL(bl);urls.push(f.url);
@@ -1487,11 +1491,11 @@ function kitExtravioGerar(pid,pre){const p=kP(pid);if(!p)return;if(D.kxErr)retur
   catch(x){b.disabled=false;er.textContent='Erro: '+(x.message||x)+(/kit_extravios|relation|schema cache/i.test(x.message||'')?' — rode o arquivo kits_extravio.sql no Supabase.':'')}}}
 
 // anexa o termo ASSINADO ou troca o arquivo (original/assinado) de um termo, sem mexer nos itens do kit
-function kitTermoArquivo(pid,n,modo){const p=kP(pid);if(!p)return;const kg=kGrupos(pid),ts=kTm(pid).filter(t=>kg.tk(t)===n),orig=ts.filter(t=>!kTmAss(t)),ass=ts.filter(kTmAss);
- const num=n.split('@')[0],dt=(orig[0]||ass[0])?.data_termo||n.split('@')[1]||null,nome=`Termo nº ${num}${dt?' — '+kDt(dt):''}`;
+function kitTermoArquivo(pid,n,modo,pre){const p=kP(pid);if(!p)return;const kg=kGrupos(pid),ar=n.startsWith('arq:'),ts=ar?kTm(pid).filter(t=>'arq:'+t.id===n):kTm(pid).filter(t=>kg.tk(t)===n),orig=ts.filter(t=>!kTmAss(t)),ass=ts.filter(kTmAss);
+ const num=ar?'':n.split('@')[0],dt=(orig[0]||ass[0])?.data_termo||(ar?null:n.split('@')[1])||null,nome=ar?(orig[0]?.arquivo||'termo'):`Termo nº ${num}${dt?' — '+kDt(dt):''}`;
  const m=document.createElement('div');m.className='mask';
  m.innerHTML=`<div class="modal" style="max-width:640px"><h3>${modo==='assinado'?'✍ Anexar termo assinado':'✏️ Alterar termo'}</h3><div class="m">${esc(p.nome)} · ${esc(nome)}</div>
- ${modo==='alterar'?`<label>O que você quer trocar?</label><select id="aq0"><option value="orig">📄 O arquivo do termo enviado (original)${orig.length?' — atual: '+esc(orig.map(t=>t.arquivo).join(' + ')):''}</option><option value="ass">✍ O termo assinado${ass.length?' — atual: '+esc(ass.map(t=>t.arquivo).join(' + ')):' (ainda não anexado)'}</option></select>`:''}
+ ${modo==='alterar'?`<label>O que você quer trocar?</label><select id="aq0"><option value="orig">📄 O arquivo do termo enviado (original)${orig.length?' — atual: '+esc(orig.map(t=>t.arquivo).join(' + ')):''}</option><option value="ass" ${pre==='ass'?'selected':''}>✍ O termo assinado${ass.length?' — atual: '+esc(ass.map(t=>t.arquivo).join(' + ')):' (ainda não anexado)'}</option></select>`:''}
  <div style="background:#f1f6f2;border-radius:8px;padding:8px 10px;margin:8px 0" class="m">Os itens do kit <b>não mudam</b>. ${modo==='assinado'?'O termo enviado continua guardado; o assinado fica junto, como comprovante (botão “✍ Ver assinado”).':'O arquivo anterior é substituído pelo novo.'}</div>
  <label>Arquivo — 1ª página (PDF, foto ou Word)</label><input type="file" id="aq1" accept=".pdf,.docx,image/*,application/pdf,${kDocxTipo}">
  <label>2ª página (opcional)</label><input type="file" id="aq2" accept=".pdf,image/*,application/pdf">
@@ -1506,12 +1510,17 @@ function kitTermoArquivo(pid,n,modo){const p=kP(pid);if(!p)return;const kg=kGrup
     er.textContent=a.length>1?`Enviando página ${i+1} de ${a.length}…`:'Enviando…';
     const {error:ue}=await sb.storage.from('fotos').upload(pa,f,{contentType:ct});if(ue)throw new Error(ue.message+(/mime|type/i.test(ue.message)?' (o armazenamento "fotos" não aceita este tipo de arquivo — libere PDF/Word nas configurações do Storage do Supabase)':''));
     env.push({f,ct,url:sb.storage.from('fotos').getPublicUrl(pa).data.publicUrl})}
-   const ob=`Termo nº ${num}`+(qual==='ass'?' · assinado':'');
-   let r=await sb.from('kit_termos').insert(env.map((x,i)=>({pessoa_id:p.id,url:x.url,arquivo:x.f.name,tipo_arquivo:x.ct,data_termo:dt,obs:ob+(env.length>1?` · página ${i+1}/${env.length}`:''),usuario_id:me.id,usuario_nome:me.nome})));if(r.error)throw r.error;
+   const ob=(ar?(orig[0]?.obs||''):`Termo nº ${num}`)+(qual==='ass'?(ar?'':' · ')+'assinado':'');
+   let r=await sb.from('kit_termos').insert(env.map((x,i)=>({pessoa_id:p.id,url:x.url,arquivo:x.f.name,tipo_arquivo:x.ct,data_termo:dt,obs:((ob+(env.length>1?` · página ${i+1}/${env.length}`:'')).replace(/^ · /,''))||null,usuario_id:me.id,usuario_nome:me.nome})));if(r.error)throw r.error;
    let aviso='';if(velhos.length){r=await sb.from('kit_termos').delete().in('id',velhos.map(t=>t.id)).select();if(r.error||(r.data||[]).length<velhos.length)aviso=' (o arquivo anterior não pôde ser removido — apenas o usuário principal pode; os dois ficaram guardados)'}
    await logEdit('kits',p.nome+' — '+nome,[[qual==='ass'?'termo assinado':'arquivo do termo',velhos.map(t=>t.arquivo).join(' + ')||'—',a.map(f=>f.name).join(' + ')]]);
    m.remove();kReabre=pid;toast((qual==='ass'?(velhos.length?'Termo assinado substituído ✔':'Termo assinado anexado ✔'):'Arquivo do termo substituído ✔')+aviso);await load();render()}
   catch(x){b.disabled=false;er.textContent='Erro: '+(x.message||x)}}}
+// exclui só o termo ASSINADO (todas as páginas); o termo enviado e os itens continuam
+function kitTermoExcluirAss(id){const t0=(D.kt||[]).find(x=>String(x.id)===String(id));if(!t0)return;const p=kP(t0.pessoa_id),pg=kTmPaginas(t0);
+ form('🗑 Excluir termo assinado',[{k:'aviso',l:`<div style="font-weight:400">Sai só o <b>termo assinado</b> (${esc(pg.map(t=>t.arquivo).join(' + '))}). O termo enviado e os itens do kit continuam. Depois é só usar “✍ Anexar assinado” para incluir de novo.</div>`,t:'hidden',value:''},pwField],'Excluir',async v=>{
+  if(!await checkPw(v.senha))return'Senha incorreta.';const r=await sb.from('kit_termos').delete().in('id',pg.map(t=>t.id)).select();if(r.error)throw r.error;if(!r.data?.length)return'Apenas o usuário principal pode excluir.';
+  await logEdit('kits',(p?.nome||'')+' — termo assinado',[['termo assinado excluído',pg.map(t=>t.arquivo).join(' + '),'—']]);kReabre=t0.pessoa_id;toast('Termo assinado excluído ✔')})}
 function kitTermoExcluirGrupo(pid,n){const p=kP(pid);if(!p)return;const kg=kGrupos(pid),tms=kTm(pid),ar=n.startsWith('arq:');
  const ts=ar?tms.filter(t=>'arq:'+t.id===n):tms.filter(t=>kg.tk(t)===n),all=ar?[]:(D.ki||[]).filter(x=>String(x.pessoa_id)===String(pid)&&kg.ik(x)===n),at=all.filter(x=>x.status==='com_pessoa'),en=all.filter(x=>x.status!=='com_pessoa');
  const nome=ar?(ts[0]?.arquivo||'termo'):'Termo nº '+n.split('@')[0]+(ts[0]?.data_termo?' — '+kDt(ts[0].data_termo):'');
@@ -1542,7 +1551,7 @@ function kitRel(tipo){const ps=kLista();if(!ps.length)return toast('Nenhuma pess
 // ---------- Telas ----------
 function render(){
  const tabs=[['painel','🧰 Ferramentas'],['hist','🕘 Movimentações'],['locais','📍 Locais'],['pessoas','👷 Pessoas'],['kits','🎒 Kits pessoais'+((()=>{const n=(D.p||[]).filter(p=>kDiv(p.id)).length;return n?' <span class="pill u" title="Kits com divergência na última conferência">'+n+'</span>':''})())],['funcoes','🏷️ Funções'],['edic','✏️ Edições']];{const nr=rcPend().length+rcRec().length;tabs.push(['recol','🚚 Recolhimentos'+(nr?' <span class="pill u">'+nr+'</span>':'')]);const na=aprPend().length;tabs.push(['aprov','🔀 Aprovações'+(na?' <span class="pill u">'+na+'</span>':'')])}if(me.papel==='principal')tabs.push(['acessos','🔑 Acessos']);
- $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas <span style="font-size:11px;font-weight:400;opacity:.75">versão 18/11 12h15</span></h1><small>${esc(me.nome)} (${meCargo()||(me.papel==='principal'?'principal':'correlato')})</small><button class="btn o s" onclick="sair()">Sair</button></header>
+ $('#app').innerHTML=`<header><h1>🛠️ CIMI · Controle de Ferramentas <span style="font-size:11px;font-weight:400;opacity:.75">versão 20/11 10h30</span></h1><small>${esc(me.nome)} (${meCargo()||(me.papel==='principal'?'principal':'correlato')})</small><button class="btn o s" onclick="sair()">Sair</button></header>
  <nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';q='';render()">${t[1]}</button>`).join('')}</nav><main>${{painel,hist:histView,locais,pessoas,kits,funcoes,edic,acessos,recol:recolHtml,aprov:aprovView}[tab]()}</main>`;
  const s=$('#q');if(s){s.oninput=e=>{if(!e.inputType){e.target.value=q;return}q=e.target.value;const p=e.target.selectionStart;render();const n=$('#q');n.focus();n.setSelectionRange(p,p)}}
  if(kReabre){const k=kReabre;kReabre=null;kitVer(k);if(kExtPend&&String(kExtPend.pid)===String(k)){const e=kExtPend;kExtPend=null;kitExtravioGerar(e.pid,e.ids)}}}
